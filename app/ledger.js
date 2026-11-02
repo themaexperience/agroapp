@@ -24,7 +24,13 @@ export function nuevoId() {
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
-const esFecha = (f) => typeof f === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f);
+// Fecha aaaa-mm-dd que existe en el calendario (rechaza 2026-02-30 o 2026-13-01).
+const esFecha = (f) => {
+  if (typeof f !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  const [a, m, d] = f.split('-').map(Number);
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  return dt.getUTCFullYear() === a && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
 
 // Devuelve lista de errores (vacía = válido).
 export function validarMovimiento(m) {
@@ -211,22 +217,66 @@ export function construirIndice(movimientos) {
 //   explicada             cuadra y hay una explicación con motivo vinculada
 //   cuadra                cuadró desde que se contó
 //   anulado               conteo anulado (queda visible, tachado)
-export const ROJOS = new Set(['sin_explicar', 'reabierta']);
-export const ABIERTOS = new Set(['sin_explicar', 'reabierta', 'cuadra_sin_confirmar']);
+export const ROJOS = new Set(['sin_explicar', 'reabierta', 'a_revisar']);
+export const ABIERTOS = new Set(['sin_explicar', 'reabierta', 'a_revisar', 'cuadra_sin_confirmar']);
+//   a_revisar             conteo viejo (backup v0.1) sin diferencia original conocida y que hoy cuadra: no se sabe
+//                         si al contar había diferencia, así que nunca se muestra verde hasta confirmarlo (rojo)
+// "Reabierta" solo si alguna vez estuvo cerrada: hubo una confirmación, o los ajustes vinculados llegaron a cubrir
+// toda la diferencia original. Un ajuste parcial (−1 sobre −4) no cierra nada: sigue "sin explicar".
+// Una confirmación guarda qué movimientos confirmó (extra.confirma). Si alguno se anula, o se corrige cambiando el
+// hecho (fecha, tipo, lugar o cantidad), esa confirmación ya no vale: hay que volver a confirmar. Corregir solo la
+// nota o la caravana no la invalida. Las confirmaciones anteriores a la última quedan como "reemplazadas".
 
 export function estadoConteos(conteos, movimientos, idx = null) {
   idx = idx || construirIndice(movimientos);
   const fechaDe = new Map(conteos.map((c) => [c.id, c.fecha]));
   const vinc = new Map();
+  const anulados = new Set();
   for (const m of movimientos) {
-    if (m.anulado || m.tipo !== 'ajuste' || !m.conteoId || !fechaDe.has(m.conteoId)) continue;
+    if (m.anulado) { anulados.add(m.id); continue; }
+    if (m.tipo !== 'ajuste' || !m.conteoId || !fechaDe.has(m.conteoId)) continue;
     let v = vinc.get(m.conteoId);
-    if (!v) { v = { ajustes: [], hasta: 0, total: 0 }; vinc.set(m.conteoId, v); }
+    if (!v) { v = { ajustes: [], hasta: 0, total: 0, conCantidad: 0, confirmaciones: [] }; vinc.set(m.conteoId, v); }
     const s = signoAjuste(m);
     v.ajustes.push(m); v.total += s;
+    if (m.cantidad !== 0) v.conCantidad += s; else v.confirmaciones.push(m);
     if (m.fecha <= fechaDe.get(m.conteoId)) v.hasta += s;
   }
-  const vacio = { ajustes: [], hasta: 0, total: 0 };
+  const vacio = { ajustes: [], hasta: 0, total: 0, conCantidad: 0, confirmaciones: [] };
+  // Qué pasó con cada movimiento que una confirmación dio por bueno. Corregir anula el renglón y crea otro
+  // (corrigeA): si el nuevo dice el mismo hecho (fecha, tipo, lugar y cantidad; cambió solo nota o caravana),
+  // la confirmación sigue valiendo. Si cambió el hecho, "se corrigió"; si se anuló sin reemplazo, "se anuló".
+  const porId = new Map();
+  const correccionDe = new Map();
+  for (const m of movimientos) { porId.set(m.id, m); if (m.corrigeA) correccionDe.set(m.corrigeA, m); }
+  const lugarIgual = (a, b) => (a?.rodeoId ?? null) === (b?.rodeoId ?? null) && (a?.categoriaId ?? null) === (b?.categoriaId ?? null);
+  const mismoHecho = (a, b) => a.fecha === b.fecha && a.tipo === b.tipo && a.cantidad === b.cantidad
+    && lugarIgual(a.origen, b.origen) && lugarIgual(a.destino, b.destino);
+  const suerte = (id) => {
+    for (let n = 0; n < 100; n++) {
+      const m = porId.get(id);
+      if (!m) return 'anulado';
+      if (!m.anulado) return 'ok';
+      const nuevo = correccionDe.get(id);
+      if (!nuevo) return 'anulado';
+      if (!mismoHecho(m, nuevo)) return 'corregido';
+      id = nuevo.id;
+    }
+    return 'anulado';
+  };
+  // Validez de cada confirmación: { vale, razon } con razon 'anulado' | 'corregido' | 'reemplazada' | null.
+  const validarConfirmaciones = (v) => {
+    const orden = [...v.confirmaciones].sort((a, b) => ((a.creado || '') < (b.creado || '') ? -1 : (a.creado || '') > (b.creado || '') ? 1 : 0));
+    const res = new Map();
+    orden.forEach((cf, i) => {
+      const ids = cf.extra && Array.isArray(cf.extra.confirma) ? cf.extra.confirma : [];
+      let razon = null;
+      for (const id of ids) { const r = suerte(id); if (r !== 'ok') { razon = r; if (r === 'anulado') break; } }
+      if (!razon && i < orden.length - 1) razon = 'reemplazada';
+      res.set(cf.id, { vale: !razon, razon });
+    });
+    return { res, ultima: orden.length ? orden[orden.length - 1] : null };
+  };
   return conteos.map((c) => {
     const v = vinc.get(c.id) || vacio;
     const calculado = idx.stockA(clave(c.rodeoId, c.categoriaId), c.fecha) - v.hasta;
@@ -234,16 +284,65 @@ export function estadoConteos(conteos, movimientos, idx = null) {
     const explicado = v.total;
     const pendiente = diferencia - explicado;
     const original = typeof c.diferenciaOriginal === 'number' ? c.diferenciaOriginal : null;
+    const base = original !== null ? original : diferencia;
+    const cubierta = base !== 0 && Math.sign(v.conCantidad) === Math.sign(base) && Math.abs(v.conCantidad) >= Math.abs(base);
+    const estuvoCerrada = v.confirmaciones.length > 0 || cubierta;
+    const val = validarConfirmaciones(v);
+    const vigente = !!val.ultima && val.res.get(val.ultima.id).vale;
     let estado;
     if (c.anulado) estado = 'anulado';
-    else if (pendiente !== 0) estado = v.ajustes.length ? 'reabierta' : 'sin_explicar';
-    else if (v.ajustes.length) estado = 'explicada';
+    else if (pendiente !== 0) estado = estuvoCerrada ? 'reabierta' : 'sin_explicar';
+    else if (v.conCantidad !== 0) estado = 'explicada';
+    else if (v.confirmaciones.length && vigente) estado = 'explicada';
+    else if (v.confirmaciones.length) estado = 'cuadra_sin_confirmar'; // la confirmación anterior quedó vieja
     else if (original !== null && original !== 0) estado = 'cuadra_sin_confirmar';
+    else if (original === null && c.aRevisar) estado = 'a_revisar';
     else estado = 'cuadra';
     // Doble descuento: los movimientos reales ya explican todo (diferencia 0) y además hay un ajuste con cantidad.
-    const dobleDescuento = estado === 'reabierta' && diferencia === 0 && explicado !== 0;
-    return { conteo: c, calculado, diferencia, explicado, pendiente, original, ajustes: v.ajustes, estado, dobleDescuento };
+    const dobleDescuento = estado === 'reabierta' && diferencia === 0 && v.conCantidad !== 0;
+    const confirmacionVieja = v.confirmaciones.length > 0 && !vigente;
+    const razonVieja = confirmacionVieja ? val.res.get(val.ultima.id).razon : null;
+    return { conteo: c, calculado, diferencia, explicado, pendiente, original, ajustes: v.ajustes, estado, dobleDescuento,
+      confirmacionVieja, razonVieja, validezConfirmaciones: val.res };
   });
+}
+
+// Conteos de backups viejos (v0.1) no guardaban la diferencia del momento de contar. Se reconstruye con los
+// movimientos que ya estaban cargados cuando se contó (campo "creado"): fecha ≤ la del conteo, creados antes
+// que el conteo y no anulados todavía en ese momento. Si falta el dato para reconstruirla, el conteo queda
+// "a revisar" (rojo): nunca se da por bueno sin saber. Devuelve { conteos, cambiados }.
+export function migrarConteos(conteos, movimientos) {
+  const pend = conteos.filter((c) => c && typeof c.diferenciaOriginal !== 'number' && !c.aRevisar);
+  if (!pend.length) return { conteos, cambiados: [] };
+  const porClave = new Map();
+  for (const c of pend) { const k = clave(c.rodeoId, c.categoriaId); let l = porClave.get(k); if (!l) { l = []; porClave.set(k, l); } l.push(c); }
+  const calc = new Map(pend.map((c) => [c.id, 0]));
+  const sinDato = new Set();
+  for (const m of movimientos) {
+    if (m.tipo === 'ajuste' && m.cantidad === 0) continue;
+    for (const [lado, signo] of [[m.origen, -1], [m.destino, 1]]) {
+      if (!lado) continue;
+      const l = porClave.get(clave(lado.rodeoId, lado.categoriaId));
+      if (!l) continue;
+      for (const c of l) {
+        if (m.fecha > c.fecha) continue;
+        if (m.conteoId === c.id) continue;
+        if (!m.creado || !c.creado) { sinDato.add(c.id); continue; }
+        if (m.creado > c.creado) continue;                                   // se cargó después de contar
+        if (m.anulado && (!m.anulado.fecha || m.anulado.fecha <= c.creado)) continue; // ya estaba anulado al contar
+        calc.set(c.id, calc.get(c.id) + signo * m.cantidad);
+      }
+    }
+  }
+  const cambiados = [];
+  const porId = new Map();
+  for (const c of pend) {
+    const n = { ...c };
+    if (!c.creado || sinDato.has(c.id)) n.aRevisar = true;
+    else { n.calculadoAlContar = calc.get(c.id); n.diferenciaOriginal = c.cantidad - n.calculadoAlContar; }
+    cambiados.push(n); porId.set(c.id, n);
+  }
+  return { conteos: conteos.map((c) => porId.get(c?.id) || c), cambiados };
 }
 
 // Compatibilidad: solo conteos vivos (no anulados).
@@ -313,26 +412,35 @@ function mesesEntre(desde, hasta) {
 }
 
 // Historial mensual: stock al último día de cada mes + resumen de movimientos del mes.
+// Un solo recorrido del libro: se agrupan los cambios por mes y después se acumulan mes a mes (sin ordenar los movimientos).
 export function historialMensual(movimientos, hoy) {
-  const vivos = movimientos.filter(activo);
-  if (!vivos.length) return [];
-  let min = vivos[0].fecha;
-  for (const m of vivos) if (m.fecha < min) min = m.fecha;
-  const meses = mesesEntre(min.slice(0, 7), hoy.slice(0, 7));
-  const fechas = meses.map(finDeMes);
-  const stocks = stockAFechas(vivos, fechas);
-  const resumen = new Map(meses.map((ym) => [ym, {}]));
-  for (const m of vivos) {
-    const r = resumen.get(m.fecha.slice(0, 7));
-    if (!r) continue;
+  let min = null;
+  const deltas = new Map(); // 'YYYY-MM' -> Map clave -> delta
+  const resumen = new Map();
+  const tope = hoy.slice(0, 7);
+  for (const m of movimientos) {
+    if (m.anulado) continue;
+    const ym = m.fecha.slice(0, 7);
+    if (min === null || m.fecha < min) min = m.fecha;
+    if (ym > tope) continue;
+    let d = deltas.get(ym);
+    if (!d) { d = new Map(); deltas.set(ym, d); resumen.set(ym, {}); }
+    if (m.origen) { const k = clave(m.origen.rodeoId, m.origen.categoriaId); d.set(k, (d.get(k) || 0) - m.cantidad); }
+    if (m.destino) { const k = clave(m.destino.rodeoId, m.destino.categoriaId); d.set(k, (d.get(k) || 0) + m.cantidad); }
+    const r = resumen.get(ym);
     const s = m.tipo === 'ajuste' ? signoAjuste(m) : m.cantidad;
     r[m.tipo] = (r[m.tipo] || 0) + s;
   }
+  if (min === null) return [];
+  const meses = mesesEntre(min.slice(0, 7), tope);
+  const mapa = new Map();
   let anterior = null;
-  return meses.map((ym, i) => {
-    const st = stocks.get(fechas[i]);
+  return meses.map((ym) => {
+    const d = deltas.get(ym);
+    if (d) for (const [k, v] of d) mapa.set(k, (mapa.get(k) || 0) + v);
+    const st = new Map(mapa);
     const t = totales(st);
-    const fila = { mes: ym, fecha: fechas[i], stock: st, ...t, resumen: resumen.get(ym), variacion: anterior === null ? null : t.total - anterior };
+    const fila = { mes: ym, fecha: finDeMes(ym), stock: st, ...t, resumen: resumen.get(ym) || {}, variacion: anterior === null ? null : t.total - anterior };
     anterior = t.total;
     return fila;
   });
@@ -359,51 +467,123 @@ export function armarBackup(estado, ahoraIso) {
   };
 }
 
-// Valida un backup leído. Devuelve { ok, errores, estado }.
-export function validarBackup(b) {
+// Valida un backup leído ANTES de tocar la base. Devuelve { ok, errores, total, estado }.
+// Revisa todo lo que la base necesita para guardar sin fallar a mitad de camino (identificadores de texto,
+// no vacíos y únicos) y todo lo que la lógica necesita para que el stock tenga sentido (tipos, cantidades,
+// fechas, referencias a rodeos y categorías, vínculos entre renglones). Si hay problemas, no se escribe nada.
+// Se informan los primeros MAX_ERRORES, en castellano, diciendo qué renglón y por qué.
+export const MAX_ERRORES = 5;
+const esId = (x) => typeof x === 'string' && x.trim() !== '';
+const esObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+const TANDA_VALIDAR = 2000;
+function* validarGen(b) {
   const errores = [];
-  if (!b || typeof b !== 'object') return { ok: false, errores: ['El archivo no es un backup de esta app'] };
-  if (b.app !== 'stock-campo-san-jose') errores.push('El archivo no es un backup de esta app');
-  if (typeof b.formato !== 'number' || b.formato > FORMATO_VERSION) errores.push('Versión de backup desconocida');
+  const err = (t) => errores.push(t);
+  const salida = () => {
+    const total = errores.length;
+    const lista = errores.slice(0, MAX_ERRORES);
+    if (total > MAX_ERRORES) lista.push(`y ${total - MAX_ERRORES} problema${total - MAX_ERRORES === 1 ? '' : 's'} más`);
+    return { ok: total === 0, errores: lista, total, estado: null };
+  };
+  if (!esObj(b)) return { ok: false, errores: ['El archivo no es un backup de esta app'], total: 1, estado: null };
+  if (b.app !== 'stock-campo-san-jose') err('El archivo no es un backup de esta app');
+  if (typeof b.formato !== 'number' || b.formato > FORMATO_VERSION) err('Versión de backup desconocida');
   for (const k of ['rodeos', 'categorias', 'movimientos', 'conteos']) {
-    if (!Array.isArray(b[k])) errores.push(`Falta la lista de ${k}`);
-    else if (b.cuentas && b.cuentas[k] !== undefined && b.cuentas[k] !== b[k].length) errores.push(`El archivo dice ${b.cuentas[k]} ${k} pero trae ${b[k].length}: puede estar incompleto`);
+    if (!Array.isArray(b[k])) err(`Falta la lista de ${k}`);
+    else if (b.cuentas && b.cuentas[k] !== undefined && b.cuentas[k] !== b[k].length) err(`El archivo dice ${b.cuentas[k]} ${k} pero trae ${b[k].length}: puede estar incompleto`);
   }
-  if (errores.length) return { ok: false, errores };
+  if (b.parametros !== undefined && b.parametros !== null && !esObj(b.parametros)) err('Los parámetros del archivo están dañados');
+  if (errores.length) return salida();
+
+  // Identificador: texto no vacío y sin repetir dentro de su lista.
+  const chequearId = (x, nombre, vistos) => {
+    if (!esId(x.id)) { err(`${nombre}: falta el identificador o está dañado`); return false; }
+    if (vistos.has(x.id)) { err(`${nombre}: el identificador "${x.id}" está repetido`); return false; }
+    vistos.add(x.id); return true;
+  };
+  const anuladoOk = (a) => a === undefined || a === null || esObj(a);
+
   const rIds = new Set(), cIds = new Set();
-  b.rodeos.forEach((r, i) => {
-    if (!r || typeof r !== 'object' || !r.id || !String(r.nombre ?? '').trim()) errores.push(`Rodeo ${i + 1}: le falta el nombre o el identificador`);
-    else rIds.add(r.id);
-  });
-  b.categorias.forEach((c, i) => {
-    if (!c || typeof c !== 'object' || !c.id || !String(c.nombre ?? '').trim()) errores.push(`Categoría ${i + 1}: le falta el nombre o el identificador`);
-    else cIds.add(c.id);
-  });
-  const existe = (l) => rIds.has(l.rodeoId) && cIds.has(l.categoriaId);
-  const ids = new Set();
-  b.movimientos.forEach((m, i) => {
-    if (!m || typeof m !== 'object') { errores.push(`Movimiento ${i + 1}: renglón vacío`); return; }
-    if (ids.has(m.id)) errores.push(`Movimiento repetido (${m.id})`);
-    ids.add(m.id);
-    const e = validarMovimiento(m);
-    if (e.length) errores.push(`Movimiento ${i + 1}: ${e.join(', ')}`);
-    else for (const l of [m.origen, m.destino]) if (l && !existe(l)) { errores.push(`Movimiento ${i + 1}: usa un rodeo o categoría que no está en el archivo`); break; }
-  });
+  for (let i = 0; i < b.rodeos.length; i++) {
+    if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
+    const r = b.rodeos[i];
+    const n = `Rodeo ${i + 1}`;
+    if (!esObj(r)) { err(`${n}: renglón vacío o dañado`); continue; }
+    chequearId(r, n, rIds);
+    if (typeof r.nombre !== 'string' || !r.nombre.trim()) err(`${n}: le falta el nombre`);
+  }
+  for (let i = 0; i < b.categorias.length; i++) {
+    if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
+    const c = b.categorias[i];
+    const n = `Categoría ${i + 1}`;
+    if (!esObj(c)) { err(`${n}: renglón vacío o dañado`); continue; }
+    chequearId(c, n, cIds);
+    if (typeof c.nombre !== 'string' || !c.nombre.trim()) err(`${n}: le falta el nombre`);
+  }
+  const lugarOk = (l) => esObj(l) && rIds.has(l.rodeoId) && cIds.has(l.categoriaId);
+
+  // Conteos primero: los movimientos pueden apuntar a ellos (conteoId).
   const idsC = new Set();
-  b.conteos.forEach((c, i) => {
-    if (!c || typeof c !== 'object') { errores.push(`Conteo ${i + 1}: renglón vacío`); return; }
-    if (!c.id || idsC.has(c.id)) errores.push(`Conteo ${i + 1}: identificador vacío o repetido`);
-    idsC.add(c.id);
-    if (!esFecha(c.fecha)) errores.push(`Conteo ${i + 1}: falta la fecha`);
-    if (!Number.isInteger(c.cantidad) || c.cantidad < 0) errores.push(`Conteo ${i + 1}: la cantidad contada tiene que ser un número entero`);
-    if (!existe(c)) errores.push(`Conteo ${i + 1}: usa un rodeo o categoría que no está en el archivo`);
-  });
-  if (errores.length > 20) errores.splice(20, errores.length, 'y hay más errores');
+  for (let i = 0; i < b.conteos.length; i++) {
+    if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
+    const c = b.conteos[i];
+    const n = `Conteo ${i + 1}`;
+    if (!esObj(c)) { err(`${n}: renglón vacío o dañado`); continue; }
+    chequearId(c, n, idsC);
+    if (!esFecha(c.fecha)) err(`${n}: la fecha falta o no es válida`);
+    if (!Number.isInteger(c.cantidad) || c.cantidad < 0) err(`${n}: la cantidad contada tiene que ser un número entero (0 o más)`);
+    if (!lugarOk(c)) err(`${n}: usa un rodeo o una categoría que no está en el archivo`);
+    if (!anuladoOk(c.anulado)) err(`${n}: la marca de anulado está dañada`);
+  }
+
+  const idsM = new Set();
+  for (let i = 0; i < b.movimientos.length; i++) {
+    if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
+    const m = b.movimientos[i];
+    const n = `Movimiento ${i + 1}`;
+    if (!esObj(m)) { err(`${n}: renglón vacío o dañado`); continue; }
+    chequearId(m, n, idsM);
+    const e = validarMovimiento(m);
+    if (e.length) err(`${n}: ${e.join(', ').toLowerCase()}`);
+    else for (const l of [m.origen, m.destino]) if (l && !lugarOk(l)) { err(`${n}: usa un rodeo o una categoría que no está en el archivo`); break; }
+    if (!anuladoOk(m.anulado)) err(`${n}: la marca de anulado está dañada`);
+    if (m.extra !== undefined && m.extra !== null && !esObj(m.extra)) err(`${n}: los datos extra están dañados`);
+  }
+  // Vínculos entre renglones: tienen que apuntar a algo que existe en el archivo (en la app nada se borra).
+  for (let i = 0; i < b.movimientos.length; i++) {
+    if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
+    const m = b.movimientos[i];
+    if (!esObj(m)) continue;
+    const n = `Movimiento ${i + 1}`;
+    if (m.conteoId !== undefined && m.conteoId !== null && !idsC.has(m.conteoId)) err(`${n}: está vinculado a un conteo que no está en el archivo`);
+    if (m.corrigeA !== undefined && m.corrigeA !== null && !idsM.has(m.corrigeA)) err(`${n}: corrige un movimiento que no está en el archivo`);
+    const conf = esObj(m.extra) ? m.extra.confirma : undefined;
+    if (conf !== undefined) {
+      if (!Array.isArray(conf)) err(`${n}: la lista de movimientos confirmados está dañada`);
+      else if (conf.some((id) => !idsM.has(id))) err(`${n}: confirma un movimiento que no está en el archivo`);
+    }
+  }
+  if (errores.length) return salida();
   return {
-    ok: errores.length === 0,
-    errores,
+    ok: true, errores: [], total: 0,
     estado: { rodeos: b.rodeos, categorias: b.categorias, movimientos: b.movimientos, conteos: b.conteos, parametros: b.parametros || {} },
   };
+}
+
+// Versión de un tirón (pruebas, Node).
+export function validarBackup(b) {
+  const g = validarGen(b);
+  let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
+}
+
+// Versión que cede el hilo cada TANDA_VALIDAR renglones, para no congelar la pantalla con 20.000 movimientos.
+export async function validarBackupEnTandas(b, ceder) {
+  const g = validarGen(b);
+  let r = g.next();
+  while (!r.done) { await ceder(); r = g.next(); }
+  return r.value;
 }
 
 // Huella del stock para comparar instalaciones (criterio 7).

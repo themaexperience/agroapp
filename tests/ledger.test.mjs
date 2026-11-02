@@ -92,7 +92,8 @@ test('D1: diferencia en rojo hasta ajuste vinculado exacto con motivo', () => {
   assert.equal(d.calculado, 68); assert.equal(d.diferencia, -3); assert.equal(d.estado, 'sin_explicar');
   const aj1 = mov('ajuste', '2026-11-08', 2, lado('A', 'vacas'), null, { conteoId: 'c1', motivo: 'muerte no anotada' });
   d = L.diferenciasConteo([c], [...l, aj1])[0];
-  assert.equal(d.estado, 'reabierta'); assert.equal(d.pendiente, -1); assert.equal(d.calculado, 68);
+  // Un ajuste parcial no cierra nada: sigue "sin explicar" (no "reabierta", porque nunca estuvo cerrada).
+  assert.equal(d.estado, 'sin_explicar'); assert.equal(d.pendiente, -1); assert.equal(d.calculado, 68);
   const aj2 = mov('ajuste', '2026-11-08', 1, lado('A', 'vacas'), null, { conteoId: 'c1', motivo: 'error de conteo' });
   d = L.diferenciasConteo([c], [...l, aj1, aj2])[0];
   assert.equal(d.estado, 'explicada');
@@ -184,4 +185,127 @@ test('20.000 movimientos: cálculo rápido', () => {
   L.pistas(L.diferenciasConteo(cs, big, idx));
   const ms = performance.now() - t0;
   assert.ok(ms < 500, `tardó ${ms} ms`);
+});
+
+test('D1: una confirmación vieja no se reutiliza si se anuló lo que confirmaba', () => {
+  const l = libro();
+  const c2 = conteo('c2', '2026-11-08', 'B', 'vacas', 25, l); // −2
+  const m = mov('mortandad', '2026-11-06', 2, lado('B', 'vacas'), null, { creado: '2026-11-09T10:00:00.000Z' });
+  const conf = mov('ajuste', '2026-11-08', 0, null, lado('B', 'vacas'), { conteoId: 'c2', motivo: 'por la mortandad', extra: { confirma: [m.id] } });
+  assert.equal(L.diferenciasConteo([c2], [...l, m, conf])[0].estado, 'explicada');
+  const mAnul = { ...m, anulado: { fecha: '2026-11-10T10:00:00.000Z', motivo: 'no era' } };
+  assert.equal(L.diferenciasConteo([c2], [...l, mAnul, conf])[0].estado, 'reabierta');
+  const otro = mov('venta', '2026-11-07', 2, lado('B', 'vacas'), null, { creado: '2026-11-11T10:00:00.000Z' });
+  const d = L.diferenciasConteo([c2], [...l, mAnul, conf, otro])[0];
+  assert.equal(d.estado, 'cuadra_sin_confirmar'); assert.ok(d.confirmacionVieja);
+});
+
+test('D1: corregir solo la nota no invalida la confirmación; corregir la cantidad sí ("se corrigió")', () => {
+  const l = libro();
+  const c2 = conteo('c2', '2026-11-08', 'B', 'vacas', 25, l); // −2
+  const m = mov('mortandad', '2026-11-06', 2, lado('B', 'vacas'), null, { creado: '2026-11-09T10:00:00.000Z' });
+  const conf = mov('ajuste', '2026-11-08', 0, null, lado('B', 'vacas'), { conteoId: 'c2', motivo: 'por la mortandad', creado: '2026-11-09T11:00:00.000Z', extra: { confirma: [m.id] } });
+  const mAnul = { ...m, anulado: { fecha: '2026-11-10T10:00:00.000Z', motivo: 'Corregido: nota' } };
+  const soloNota = { ...m, id: 'corr1', nota: 'en el bajo', corrigeA: m.id, creado: '2026-11-10T10:00:00.000Z' };
+  let d = L.diferenciasConteo([c2], [...l, mAnul, soloNota, conf])[0];
+  assert.equal(d.estado, 'explicada'); assert.ok(!d.confirmacionVieja);
+  // Corrección que cambia la cantidad (3 en vez de 2) y otra mortandad de −1 compensa: cuadra, pero hay que reconfirmar.
+  const otraCant = { ...m, id: 'corr2', cantidad: 3, corrigeA: m.id, creado: '2026-11-10T10:00:00.000Z' };
+  const ingreso = mov('ingreso', '2026-11-07', 1, null, lado('B', 'vacas'), { creado: '2026-11-11T10:00:00.000Z' });
+  d = L.diferenciasConteo([c2], [...l, mAnul, otraCant, ingreso, conf])[0];
+  assert.equal(d.estado, 'cuadra_sin_confirmar'); assert.equal(d.razonVieja, 'corregido');
+  // Reconfirmar: la vieja queda "reemplazada" (ya no vale) y la nueva vale.
+  const conf2 = mov('ajuste', '2026-11-08', 0, null, lado('B', 'vacas'), { conteoId: 'c2', motivo: 'corregida', creado: '2026-11-12T10:00:00.000Z', extra: { confirma: ['corr2', ingreso.id] } });
+  d = L.diferenciasConteo([c2], [...l, mAnul, otraCant, ingreso, conf, conf2])[0];
+  assert.equal(d.estado, 'explicada');
+  assert.equal(d.validezConfirmaciones.get(conf.id).vale, false);
+  assert.equal(d.validezConfirmaciones.get(conf2.id).vale, true);
+});
+
+test('migración de conteos v0.1: reconstruye la diferencia al contar o los deja a revisar (nunca verdes)', () => {
+  const l = libro().map((m) => ({ ...m, creado: '2026-11-01T10:00:00.000Z' }));
+  const viejo = { id: 'v1', fecha: '2026-11-08', rodeoId: 'B', categoriaId: 'vacas', cantidad: 25, creado: '2026-11-08T12:00:00.000Z', anulado: null };
+  const tarde = mov('mortandad', '2026-11-06', 2, lado('B', 'vacas'), null, { creado: '2026-11-09T10:00:00.000Z' });
+  const libroTotal = [...l, tarde];
+  // Sin migrar, hoy cuadra y se vería "Cuadra" (el problema de la v0.2).
+  const { conteos, cambiados } = L.migrarConteos([viejo], libroTotal);
+  assert.equal(cambiados.length, 1);
+  assert.equal(conteos[0].diferenciaOriginal, -2);
+  assert.equal(L.diferenciasConteo(conteos, libroTotal)[0].estado, 'cuadra_sin_confirmar');
+  // Sin fecha de carga no se puede reconstruir: a revisar (rojo).
+  const sinCreado = { ...viejo, id: 'v2', creado: undefined };
+  const r2 = L.migrarConteos([sinCreado], libroTotal);
+  assert.ok(r2.conteos[0].aRevisar);
+  const d2 = L.diferenciasConteo(r2.conteos, libroTotal)[0];
+  assert.equal(d2.estado, 'a_revisar'); assert.ok(L.ROJOS.has(d2.estado));
+  // Idempotente: lo ya migrado no se toca.
+  assert.equal(L.migrarConteos(conteos, libroTotal).cambiados.length, 0);
+});
+
+test('historial mensual en un recorrido = stock a fin de cada mes', () => {
+  const l = libro();
+  const h = L.historialMensual(l, '2026-12-15');
+  for (const f of h) assert.equal(L.huellaStock(l.filter((m) => m.fecha <= f.fecha)), [...f.stock.entries()].filter(([, v]) => v !== 0).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k}=${v}`).join(';'));
+  assert.equal(h[h.length - 1].mes, '2026-12');
+});
+
+// ---- Vuelta 5: validación completa del backup antes de tocar la base ----
+function backupBueno() {
+  const rodeos = [{ id: 'A', nombre: 'Cola' }, { id: 'B', nombre: 'Cuerpo' }];
+  const categorias = ['vacas', 'terneros', 'mamones', 'toros'].map((id) => ({ id, nombre: id }));
+  const movimientos = libro();
+  const conteos = [{ id: 'k1', fecha: '2026-11-09', rodeoId: 'A', categoriaId: 'vacas', cantidad: 66, anulado: null }];
+  movimientos.push({ ...mov('ajuste', '2026-11-09', 2, lado('A', 'vacas'), null), conteoId: 'k1', motivo: 'faltan 2' });
+  movimientos.push({ ...mov('ajuste', '2026-11-10', 0, null, lado('A', 'vacas')), conteoId: 'k1', motivo: 'confirmado', extra: { confirma: [movimientos[3].id] } });
+  movimientos.push({ ...mov('nacimiento', '2026-11-11', 1, null, lado('A', 'terneros')), corrigeA: movimientos[2].id });
+  return JSON.parse(JSON.stringify(L.armarBackup({ rodeos, categorias, movimientos, conteos, parametros: {} }, 'x')));
+}
+const errDe = (b) => { const v = L.validarBackup(b); assert.equal(v.ok, false); return v.errores.join(' | '); };
+
+test('backup bueno con vínculos pasa la validación', () => {
+  const v = L.validarBackup(backupBueno());
+  assert.equal(v.ok, true, v.errores.join(' | '));
+});
+
+test('movimiento sin id, con id objeto, vacío o repetido: se rechaza y dice qué renglón', () => {
+  for (const [pos, valor, texto] of [[0, undefined, 'falta el identificador'], [4, { x: 1 }, 'falta el identificador'], [9, '  ', 'falta el identificador'], [5, 'm1', 'repetido']]) {
+    const b = backupBueno();
+    const id0 = b.movimientos[0].id;
+    if (valor === undefined) delete b.movimientos[pos].id; else b.movimientos[pos].id = valor === 'm1' ? id0 : valor;
+    const e = errDe(b);
+    assert.match(e, new RegExp(`Movimiento ${pos + 1}: .*${texto}`));
+  }
+});
+
+test('ids de rodeo, categoría y conteo también se validan', () => {
+  let b = backupBueno(); b.rodeos[1].id = 7; assert.match(errDe(b), /Rodeo 2: falta el identificador/);
+  b = backupBueno(); b.categorias[1].id = b.categorias[0].id; assert.match(errDe(b), /Categoría 2: .*repetido/);
+  b = backupBueno(); delete b.conteos[0].id; assert.match(errDe(b), /Conteo 1: falta el identificador/);
+});
+
+test('referencias rotas: rodeo inexistente, conteo, corrección y confirmación', () => {
+  let b = backupBueno(); b.movimientos[1].destino.rodeoId = 'NO'; assert.match(errDe(b), /Movimiento 2: usa un rodeo/);
+  b = backupBueno(); b.movimientos[8].conteoId = 'NO'; assert.match(errDe(b), /Movimiento 9: está vinculado a un conteo/);
+  b = backupBueno(); b.movimientos[10].corrigeA = 'NO'; assert.match(errDe(b), /Movimiento 11: corrige un movimiento/);
+  b = backupBueno(); b.movimientos[9].extra.confirma = ['NO']; assert.match(errDe(b), /Movimiento 10: confirma un movimiento/);
+  b = backupBueno(); b.conteos[0].rodeoId = 'NO'; assert.match(errDe(b), /Conteo 1: usa un rodeo/);
+});
+
+test('fechas imposibles, cantidades no enteras y anulados dañados', () => {
+  let b = backupBueno(); b.movimientos[0].fecha = '2026-02-30'; assert.match(errDe(b), /Movimiento 1: falta la fecha/);
+  b = backupBueno(); b.movimientos[0].cantidad = 2.5; assert.match(errDe(b), /Movimiento 1: la cantidad/);
+  b = backupBueno(); b.conteos[0].fecha = '2026-13-01'; assert.match(errDe(b), /Conteo 1: la fecha/);
+  b = backupBueno(); b.movimientos[0].anulado = 'sí'; assert.match(errDe(b), /Movimiento 1: la marca de anulado/);
+  b = backupBueno(); b.parametros = [1]; assert.match(errDe(b), /parámetros/);
+});
+
+test('se informan los primeros 5 problemas y cuántos más hay', () => {
+  const b = backupBueno();
+  for (const m of b.movimientos) delete m.id;
+  const v = L.validarBackup(b);
+  assert.equal(v.ok, false);
+  // 11 renglones sin id, más los 2 vínculos (corrección y confirmación) que quedan apuntando a nada.
+  assert.equal(v.total, b.movimientos.length + 2);
+  assert.equal(v.errores.length, L.MAX_ERRORES + 1);
+  assert.match(v.errores.at(-1), new RegExp(`y ${v.total - L.MAX_ERRORES} problemas más`));
 });
