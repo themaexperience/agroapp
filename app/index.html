@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B4332">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stock hacienda">
+<title>Stock de hacienda</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="cabecera">
+  <div class="titulo" id="titulo">Stock de hacienda</div>
+  <div id="aviso-backup"></div>
+</header>
+<main id="vista" tabindex="-1"></main>
+<nav id="barra" aria-label="Secciones">
+  <button data-ir="cargar"><span class="ico">＋</span>Cargar</button>
+  <button data-ir="stock"><span class="ico">▦</span>Stock</button>
+  <button data-ir="conteos"><span class="ico">✓</span>Conteos</button>
+  <button data-ir="historial"><span class="ico">▤</span>Historial</button>
+  <button data-ir="mas"><span class="ico">≡</span>Más</button>
+</nav>
+<div id="modal" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="impresion"></div>
+<script src="vendor/write-excel-file.min.js"></script>
+<script src="vendor/read-excel-file.min.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
