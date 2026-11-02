@@ -3,17 +3,18 @@ import * as L from './ledger.js';
 import * as DB from './db.js';
 import { RODEOS_INICIALES, CATEGORIAS_INICIALES, PARAMETROS_INICIALES, ATAJOS, DESTINO_PROBABLE } from './seeds.js';
 
-const VERSION_APP = '0.2.0';
+const VERSION_APP = '0.3.2';
 
 // ---------- Estado ----------
 const S = {
   rodeos: [], categorias: [], movimientos: [], conteos: [], parametros: {}, meta: {},
   vista: 'cargar', sub: 'menu',
   persistido: null,
+  respaldo: null,   // { fecha, movimientos } si hay copia de antes de la última importación
 };
 let C = nuevaCarga();          // estado del asistente de carga
 let CT = { modo: 'lista' };    // estado de conteos
-let stockFecha = null, stockModo = 'rodeo', informeFecha = null, movsVer = 50, conteosVer = 20, anuladosVer = 20, abiertasVer = 30;
+let stockFecha = null, stockModo = 'rodeo', informeFecha = null, histVer = 24, movsVer = 50, conteosVer = 20, anuladosVer = 20, abiertasVer = 30;
 
 function nuevaCarga() {
   return { paso: 'tipo', tipo: null, atajo: null, rodeoO: null, rodeoD: null, catO: null, cant: {}, nota: '', caravana: '', motivo: '', signo: null, vinc: {} };
@@ -50,6 +51,42 @@ const rodeosActivos = () => S.rodeos.filter((r) => r.activo).sort((a, b) => a.or
 const catsActivas = () => S.categorias.filter((c) => c.activa).sort((a, b) => a.orden - b.orden);
 const fechaSesion = () => S.meta.fechaSesion || hoyIso();
 const activos = () => S.movimientos.filter(L.activo);
+
+// Errores que se le muestran al usuario tal cual (ya están en castellano).
+class ErrorUsuario extends Error {}
+// Traduce errores técnicos del navegador a castellano. El detalle técnico queda plegado, solo por si hace falta.
+function mensajeError(e, contexto = '') {
+  if (e instanceof ErrorUsuario) return esc(e.message);
+  const nombre = e?.name || '';
+  let txt;
+  if (nombre === 'QuotaExceededError') txt = 'El teléfono no tiene espacio libre para guardar los datos.';
+  else if (contexto === 'json') txt = 'El archivo no es un backup válido: puede estar cortado (una descarga incompleta) o ser otro tipo de archivo.';
+  else if (contexto === 'xlsx') txt = 'No se pudo abrir el Excel: el archivo está dañado o no es un Excel exportado por esta app.';
+  else if (contexto === 'db') txt = 'No se pudo escribir en la memoria del teléfono.';
+  else txt = 'Pasó algo inesperado.';
+  const det = String(e?.message || e || '');
+  return `${txt}${det ? `<details class="detalle-tec"><summary>Detalle técnico</summary><span>${esc(det)}</span></details>` : ''}`;
+}
+
+// Aviso "Procesando…" para operaciones largas (importar o exportar miles de renglones). Tapa la pantalla para
+// que no se toque dos veces, y espera a que se dibuje antes de seguir.
+function procesando(txt) {
+  let el = $('#procesando');
+  if (!el) { el = document.createElement('div'); el.id = 'procesando'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+  el.innerHTML = `<div class="caja-proc"><div class="ruedita" aria-hidden="true"></div><b>${esc(txt)}</b><div class="chico">Puede tardar unos segundos. No cierres la app.</div></div>`;
+  el.hidden = false;
+  return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+}
+function finProcesando() { const el = $('#procesando'); if (el) el.hidden = true; }
+const ceder = () => new Promise((r) => setTimeout(r, 0));
+
+// Evita guardar dos veces con un doble toque rápido.
+let ocupado = false;
+async function unaVez(fn) {
+  if (ocupado) return;
+  ocupado = true;
+  try { await fn(); } finally { ocupado = false; }
+}
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('ver');
@@ -116,7 +153,7 @@ async function registrar(nuevos, { anular = [], conteos = [] } = {}) {
   try {
     await DB.guardar({ movimientos: [...nuevos, ...anuladosNuevos], conteos });
   } catch (e) {
-    await aviso('No se pudo guardar', `<p class="error">${esc(e?.message || e)}</p><p>No se guardó nada. Probá de nuevo.</p>`);
+    await aviso('No se pudo guardar', `<p class="error">${mensajeError(e, 'db')}</p><p>No se guardó nada. Probá de nuevo.</p>`);
     return false;
   }
   S.movimientos = despues;
@@ -163,11 +200,48 @@ function renderAviso() {
 function ir(vista, sub) {
   S.vista = vista; if (sub) S.sub = sub; else if (vista === 'mas') S.sub = 'menu';
   if (vista === 'cargar' && !sub) C = nuevaCarga();
+  if (vista === 'historial') histVer = 24;
   if (vista === 'conteos') { CT = { modo: 'lista' }; conteosVer = 20; anuladosVer = 20; abiertasVer = 30; }
   render(); window.scrollTo(0, 0);
 }
 
+// D2: la fecha de carga fijada otro día vuelve a hoy (con un botón para seguir con la planilla anterior).
+// Se revisa al arrancar, en cada pantalla, al volver a la app y antes de guardar: una app instalada puede
+// quedar abierta de un día para otro sin recargarse. Devuelve true si cambió.
+function revisarFechaSesion() {
+  const hoy = hoyIso();
+  if (S.meta.fechaSesion && S.meta.fechaSesionDia !== hoy && S.meta.fechaSesion !== hoy) {
+    S.meta.fechaSesionAnterior = S.meta.fechaSesion;
+    delete S.meta.fechaSesion;
+    S.meta.fechaSesionDia = hoy;
+    return true;
+  }
+  return false;
+}
+
+// D2 también para el formulario de conteo: la fecha se toma al abrirlo (o al elegirla). Si cambió el día con
+// el formulario abierto, vuelve a hoy conservando lo escrito, y ofrece seguir con la fecha anterior.
+function revisarFechaConteo() {
+  const hoy = hoyIso();
+  if (CT.modo === 'nuevo' && CT.fechaDia && CT.fechaDia !== hoy && CT.fecha !== hoy) {
+    CT.fechaAnterior = CT.fecha; CT.fecha = hoy; CT.fechaDia = hoy;
+    return true;
+  }
+  return false;
+}
+
+function leerConteoVisibles() {
+  if (CT.modo !== 'nuevo') return;
+  const ins = document.querySelectorAll('[data-ccant]');
+  if (ins.length) { CT.vals = {}; for (const i of ins) CT.vals[i.dataset.ccant] = i.value; }
+  const o = $('#ct-origen'), n = $('#ct-nota');
+  if (o) CT.origenTxt = o.value;
+  if (n) CT.notaTxt = n.value;
+}
+
 function render() {
+  if (revisarFechaSesion()) guardarMeta();
+  if (revisarFechaConteo()) leerConteoVisibles();
   document.querySelectorAll('#barra button').forEach((b) => b.classList.toggle('activo', b.dataset.ir === S.vista));
   renderAviso();
   const campo = (S.parametros.campo || '').trim();
@@ -347,8 +421,13 @@ function postCargar() {
 }
 
 async function guardarCarga() {
-  const err = $('#c-error');
   leerCantVisibles();
+  if (revisarFechaSesion()) {
+    await guardarMeta(); render();
+    toast('Cambió el día: la fecha de carga volvió a hoy. Revisala y tocá Guardar de nuevo.');
+    return;
+  }
+  const err = $('#c-error');
   const pares = [];
   for (const [key, v] of Object.entries(C.cant)) {
     if (v === '' || v == null) continue;
@@ -400,7 +479,7 @@ function tablaStock(mapa, { conUbic = true, sinCeros = true, soloConAnimales = f
   const rs = S.rodeos.filter((r) => (soloConAnimales ? rodeosConDato.has(r.id) : (r.activo || rodeosConDato.has(r.id)))).sort((a, b) => a.orden - b.orden);
   const cs = S.categorias.filter((c) => (sinCeros ? catsConDato.has(c.id) : (c.activa || catsConDato.has(c.id)))).sort((a, b) => a.orden - b.orden);
   const celda = (v) => `<td class="${v < 0 ? 'neg' : ''}">${v ? num(v) : ''}</td>`;
-  const filas = rs.map((r) => `<tr><td class="txt">${esc(r.nombre)}${conUbic && r.ubicacion ? `<span class="ubic">${esc(r.ubicacion)}</span>` : ''}</td>${cs.map((c) => celda(mapa.get(L.clave(r.id, c.id)) || 0)).join('')}<td><b>${num(t.porRodeo.get(r.id) || 0)}</b></td></tr>`).join('');
+  const filas = rs.map((r) => `<tr><td class="txt">${esc(r.nombre)}${conUbic && r.ubicacion ? `<span class="ubic">${esc(r.ubicacion)}</span>` : ''}</td>${cs.map((c) => celda(mapa.get(L.clave(r.id, c.id)) || 0)).join('')}<td class="${(t.porRodeo.get(r.id) || 0) < 0 ? 'neg' : ''}"><b>${num(t.porRodeo.get(r.id) || 0)}</b></td></tr>`).join('');
   const tot = `<tr class="tot"><td class="txt">Totales</td>${cs.map((c) => `<td>${num(t.porCategoria.get(c.id) || 0)}</td>`).join('')}<td>${num(t.total)}</td></tr>`;
   return { html: `<table class="planilla"><thead><tr><th class="txt">Rodeo</th>${cs.map((c) => `<th>${esc(c.nombre)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${filas}${tot}</tbody></table>`, rs, cs, t };
 }
@@ -413,7 +492,7 @@ function tarjetasRodeo(mapa, t) {
   const con = [], sin = [];
   for (const r of rs) {
     const items = cs.map((c) => [c, mapa.get(L.clave(r.id, c.id)) || 0]).filter(([, v]) => v !== 0);
-    if (items.length) con.push(`<div class="tarjeta rodeo-card"><div class="rc-cab"><div><b>${esc(r.nombre)}</b>${r.ubicacion ? `<div class="chico">${esc(r.ubicacion)}</div>` : ''}</div><div class="rc-total">${num(t.porRodeo.get(r.id) || 0)}</div></div>
+    if (items.length) con.push(`<div class="tarjeta rodeo-card"><div class="rc-cab"><div><b>${esc(r.nombre)}</b>${r.ubicacion ? `<div class="chico">${esc(r.ubicacion)}</div>` : ''}</div><div class="rc-total ${(t.porRodeo.get(r.id) || 0) < 0 ? 'neg' : ''}">${num(t.porRodeo.get(r.id) || 0)}</div></div>
       ${items.map(([c, v]) => `<div class="rc-fila"><span>${esc(c.nombre)}</span><span class="${v < 0 ? 'neg' : ''}">${num(v)}</span></div>`).join('')}</div>`);
     else if (r.activo) sin.push(esc(r.nombre));
   }
@@ -432,7 +511,13 @@ function vStock() {
   const est = L.diferenciasConteo(S.conteos, S.movimientos, IDX());
   const rojas = est.filter((d) => L.ROJOS.has(d.estado)).length;
   const ambar = est.filter((d) => d.estado === 'cuadra_sin_confirmar').length;
-  const negs = [...mapa.values()].filter((v) => v < 0).length;
+  const negLista = [...mapa.entries()].filter(([, v]) => v < 0).map(([k, v]) => ({ ...L.desarmarClave(k), v }))
+    .sort((a, b) => (rodeo(a.rodeoId)?.orden ?? 999) - (rodeo(b.rodeoId)?.orden ?? 999) || (cat(a.categoriaId)?.orden ?? 999) - (cat(b.categoriaId)?.orden ?? 999));
+  const negs = negLista.length;
+  const MAXNEG = 10;
+  const avisoNeg = negs ? `<div class="aviso rojo" role="alert">${num(negs)} casilla${negs > 1 ? 's' : ''} en negativo al ${fFecha(f)}:
+      <ul class="lista-neg">${negLista.slice(0, MAXNEG).map((n) => `<li>${esc(nomR(n.rodeoId))} · ${esc(nomC(n.categoriaId))}: ${num(n.v)}</li>`).join('')}</ul>
+      ${negs > MAXNEG ? `<div>y ${num(negs - MAXNEG)} más.</div>` : ''}<div class="chico-aviso">Revisá los movimientos de esas casillas en Más → Movimientos.</div></div>` : '';
   const nombresVaca = S.categorias.filter((c) => c.cuentaComoVaca).map((c) => c.nombre).join(' + ') || 'ninguna categoría marcada';
   let cuerpo;
   if (stockModo === 'categoria') {
@@ -448,7 +533,7 @@ function vStock() {
     <div class="tarjeta"><div class="chico">Total de cabezas al ${fFecha(f)}</div><div class="total-grande">${num(t.total)}</div>
       <div>Vacas: <b>${num(vacasDe(t))}</b> <span class="chico">(${esc(nombresVaca)})</span></div>
       <div class="chico">Calculado con ${num(activos().length)} movimientos.</div></div>
-    ${negs ? `<div class="aviso rojo" role="alert">${num(negs)} casilla${negs > 1 ? 's' : ''} en negativo al ${fFecha(f)}. Revisá los movimientos de esos rodeos.</div>` : ''}
+    ${avisoNeg}
     ${rojas ? `<button class="aviso rojo" data-ir="conteos">${num(rojas)} diferencia${rojas > 1 ? 's' : ''} de conteo sin explicar. Tocá para verlas.</button>` : ''}
     ${ambar ? `<button class="aviso" data-ir="conteos">${num(ambar)} diferencia${ambar > 1 ? 's' : ''} que ahora cuadra${ambar > 1 ? 'n' : ''}: falta confirmar la explicación.</button>` : ''}
     <div class="fila-btns"><button class="btn ${stockModo === 'rodeo' ? 'sel' : ''}" data-stockmodo="rodeo">Por rodeo</button><button class="btn ${stockModo === 'categoria' ? 'sel' : ''}" data-stockmodo="categoria">Por categoría</button><button class="btn ${stockModo === 'planilla' ? 'sel' : ''}" data-stockmodo="planilla">Ver como planilla</button></div>
@@ -459,10 +544,12 @@ function vStock() {
 const NOMBRE_ESTADO = {
   sin_explicar: 'Diferencia sin explicar', reabierta: 'Diferencia reabierta', cuadra_sin_confirmar: 'Cuadra ahora: falta confirmar la explicación',
   explicada: 'Explicada', cuadra: 'Cuadra', anulado: 'Conteo anulado',
+  a_revisar: 'Conteo viejo a revisar',
 };
 const CLASE_ESTADO = {
   sin_explicar: 'rojo sin_explicar', reabierta: 'rojo sin_explicar reabierta', cuadra_sin_confirmar: 'ambar cuadra_sin_confirmar',
   explicada: 'explicada', cuadra: 'cuadra', anulado: 'anulado',
+  a_revisar: 'rojo sin_explicar a_revisar',
 };
 
 function vConteos() {
@@ -492,14 +579,38 @@ function vConteos() {
     ${!S.conteos.length ? '<p>Todavía no cargaste conteos.</p>' : ''}`;
 }
 
+const RAZON_VIEJA = {
+  anulado: 'se anuló un movimiento que confirmaba',
+  corregido: 'se corrigió un movimiento que confirmaba',
+  reemplazada: 'la reemplaza una confirmación posterior',
+};
+
 function itemConteo(d, pis = new Map(), expl = new Map()) {
   const c = d.conteo;
   const lineas = [];
   lineas.push(`<div>Contado <b>${num(c.cantidad)}</b> · Según el libro <b>${num(d.calculado)}</b></div>`);
-  if (d.original !== null && d.original !== 0 && d.estado !== 'sin_explicar' && d.estado !== 'anulado') lineas.push(`<div class="chico">Al contar, la diferencia era <b>${numS(d.original)}</b>.</div>`);
-  for (const m of d.ajustes) lineas.push(`<div class="chico">${m.cantidad === 0 ? 'Explicación confirmada' : `Ajuste ${numS(L.signoAjuste(m))}`} (${fFecha(m.fecha)}): ${esc(m.motivo)}</div>`);
+  // La diferencia del momento de contar se muestra siempre. Si ya se explicó una parte, se ve cuánto y cuánto falta.
+  if (d.original !== null && d.original !== 0 && d.estado !== 'anulado') {
+    const explicado = d.original - d.pendiente;
+    const parcial = L.ROJOS.has(d.estado) && !d.dobleDescuento && d.pendiente !== 0 && explicado !== 0
+      && Math.sign(d.pendiente) === Math.sign(d.original) && Math.abs(d.pendiente) < Math.abs(d.original);
+    lineas.push(parcial
+      ? `<div class="linea-orig">Al contar, la diferencia era <b>${numS(d.original)}</b> · explicado: <b>${numS(explicado)}</b> · falta: <b>${numS(d.pendiente)}</b></div>`
+      : `<div class="chico">Al contar, la diferencia era <b>${numS(d.original)}</b>.</div>`);
+  }
+  for (const m of d.ajustes) {
+    const val = m.cantidad === 0 && d.validezConfirmaciones ? d.validezConfirmaciones.get(m.id) : null;
+    if (val && !val.vale) {
+      lineas.push(`<div class="chico conf-vieja"><s>Explicación confirmada (${fFecha(m.fecha)}): ${esc(m.motivo)}</s> <b>(ya no vale: ${RAZON_VIEJA[val.razon]})</b></div>`);
+      continue;
+    }
+    lineas.push(`<div class="chico">${m.cantidad === 0 ? 'Explicación confirmada' : `Ajuste ${numS(L.signoAjuste(m))}`} (${fFecha(m.fecha)}): ${esc(m.motivo)}</div>`);
+  }
   let botones = '';
-  if (L.ROJOS.has(d.estado)) {
+  if (d.estado === 'a_revisar') {
+    lineas.push(`<div>Este conteo viene de una versión anterior de la app y no se sabe qué diferencia había al contar. Hoy cuadra con el libro, pero no se da por bueno sin que lo confirmes.</div>`);
+    botones += `<button class="btn prim" data-confirmar="${c.id}">Confirmar explicación</button>`;
+  } else if (L.ROJOS.has(d.estado)) {
     lineas.push(`<div class="num-dif">${numS(d.pendiente)}</div>`);
     if (d.dobleDescuento) {
       lineas.push(`<div class="pista"><b>Posible doble descuento:</b> los movimientos cargados ya explican la diferencia y además hay un ajuste. Si el ajuste era por lo mismo, anulá el ajuste.</div>`);
@@ -512,7 +623,7 @@ function itemConteo(d, pis = new Map(), expl = new Map()) {
     }
   } else if (d.estado === 'cuadra_sin_confirmar') {
     const ms = expl.get(c.id) || [];
-    lineas.push(`<div>Cuadra por movimientos cargados después del conteo:</div>${ms.length ? `<ul class="lista-expl">${ms.map((m) => { const x = describir(m); return `<li>${esc(x.tipo)} ${fFecha(m.fecha)} · ${esc(x.lugar)}${m.nota ? ` · ${esc(m.nota)}` : ''}</li>`; }).join('')}</ul>` : ''}`);
+    lineas.push(`<div>Cuadra por movimientos cargados después del conteo:</div>${ms.length ? `<ul class="lista-expl">${ms.map((m) => { const x = describir(m); return `<li>${esc(x.tipo)} ${fFecha(m.fecha)} · ${esc(x.lugar)}${m.motivo ? ` · Motivo: ${esc(m.motivo)}` : ''}${m.nota ? ` · ${esc(m.nota)}` : ''}</li>`; }).join('')}</ul>` : ''}`);
     botones += `<button class="btn prim" data-confirmar="${c.id}">Confirmar explicación</button>`;
   }
   if (d.estado === 'anulado') lineas.push(`<div class="anul">Anulado el ${fFechaDe(c.anulado.fecha)}: ${esc(c.anulado.motivo)}${d.original ? ` · al contar la diferencia era ${numS(d.original)}` : ''}</div>`);
@@ -527,19 +638,22 @@ function itemConteo(d, pis = new Map(), expl = new Map()) {
 
 function vConteoNuevo() {
   const f = CT.fecha || fechaSesion();
+  const ant = CT.fechaAnterior && CT.fechaAnterior !== f
+    ? `<button class="btn" data-acc="seguir-fecha-conteo">Seguir con el conteo del ${fFecha(CT.fechaAnterior)}</button>` : '';
+  const vals = CT.vals || {};
   if (!CT.rodeo) {
     return `<div class="fila-btns"><button class="btn" data-acc="conteo-cancelar">← Volver</button></div>
-      <div class="fecha-sesion"><label for="f-conteo">Fecha del conteo:</label><input type="date" id="f-conteo" value="${f}"></div>
+      <div class="fecha-sesion"><label for="f-conteo">Fecha del conteo:</label><input type="date" id="f-conteo" value="${f}">${ant}</div>
       <h1>¿Qué rodeo se contó?</h1>${gridRodeos('conteo')}`;
   }
   return `<div class="fila-btns"><button class="btn" data-acc="conteo-atras">← Atrás</button></div>
-    <div class="fecha-sesion"><label for="f-conteo">Fecha del conteo:</label><input type="date" id="f-conteo" value="${f}"></div>
+    <div class="fecha-sesion"><label for="f-conteo">Fecha del conteo:</label><input type="date" id="f-conteo" value="${f}">${ant}</div>
     <div class="resumen-sel"><b>Conteo</b> · ${esc(nomR(CT.rodeo))}</div>
     <h1>¿Cuántos se contaron?</h1><p class="chico">Dejá vacío lo que no se contó. Escribí 0 si se contó y no había ninguno.</p>
-    ${catsActivas().map((c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-ccant="${c.id}" aria-label="${esc(c.nombre)}" autocomplete="off"></div>`).join('')}
-    <details><summary>Quién o cómo se contó (opcional)</summary>
-      <label class="campo"><span>Origen del conteo (ej.: tranquera, conteo 2, acta de vacunación)</span><input type="text" id="ct-origen" autocomplete="off"></label>
-      <label class="campo"><span>Nota (opcional)</span><textarea id="ct-nota" rows="2" autocomplete="off"></textarea></label></details>
+    ${catsActivas().map((c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-ccant="${c.id}" aria-label="${esc(c.nombre)}" autocomplete="off" value="${esc(vals[c.id] || '')}"></div>`).join('')}
+    <details${CT.origenTxt || CT.notaTxt ? ' open' : ''}><summary>Quién o cómo se contó (opcional)</summary>
+      <label class="campo"><span>Origen del conteo (ej.: tranquera, conteo 2, acta de vacunación)</span><input type="text" id="ct-origen" autocomplete="off" value="${esc(CT.origenTxt || '')}"></label>
+      <label class="campo"><span>Nota (opcional)</span><textarea id="ct-nota" rows="2" autocomplete="off">${esc(CT.notaTxt || '')}</textarea></label></details>
     <div class="error" id="ct-error"></div>
     <button class="btn prim grande" data-acc="guardar-conteo">Guardar conteo</button>`;
 }
@@ -549,6 +663,12 @@ function postConteos() {
 }
 
 async function guardarConteo() {
+  leerConteoVisibles();
+  if (revisarFechaConteo()) {
+    render();
+    toast('Cambió el día: la fecha del conteo volvió a hoy. Revisala y tocá Guardar de nuevo.');
+    return;
+  }
   const err = $('#ct-error');
   const fecha = $('#f-conteo').value;
   if (!fecha) { err.textContent = 'Falta la fecha del conteo.'; return; }
@@ -565,7 +685,7 @@ async function guardarConteo() {
     nuevos.push(c);
   }
   if (!nuevos.length) { err.textContent = 'Escribí al menos una cantidad contada.'; return; }
-  try { await DB.guardar({ conteos: nuevos }); } catch (e) { err.textContent = 'No se pudo guardar: ' + (e?.message || e); return; }
+  try { await DB.guardar({ conteos: nuevos }); } catch (e) { err.innerHTML = 'No se pudo guardar. ' + mensajeError(e, 'db'); return; }
   S.conteos = S.conteos.concat(nuevos);
   const malas = nuevos.filter((c) => c.diferenciaOriginal !== 0).length;
   toast(malas ? `Conteo guardado: ${malas} diferencia${malas > 1 ? 's' : ''}` : 'Conteo guardado: todo cuadra');
@@ -594,15 +714,19 @@ async function explicar(conteoId) {
 // Ámbar → explicada: se deja escrito con motivo qué explicó la diferencia (ajuste de 0, no cambia el stock).
 async function confirmarExplicacion(conteoId) {
   const d = difDe(conteoId);
-  if (!d || d.estado !== 'cuadra_sin_confirmar') return;
+  if (!d || (d.estado !== 'cuadra_sin_confirmar' && d.estado !== 'a_revisar')) return;
   const c = d.conteo;
-  const ms = L.movimientosQueExplican([d], S.movimientos).get(c.id) || [];
-  const sugerido = ms.length ? 'Explicada por: ' + ms.map((m) => { const x = describir(m); return `${x.tipo} ${fFecha(m.fecha)} (${x.lugar})`; }).join('; ') : '';
+  const ms = d.estado === 'a_revisar' ? [] : (L.movimientosQueExplican([d], S.movimientos).get(c.id) || []);
+  const sugerido = ms.length ? 'Explicada por: ' + ms.map((m) => { const x = describir(m); return `${x.tipo} ${fFecha(m.fecha)} (${x.lugar})${m.motivo ? ' — ' + m.motivo : ''}`; }).join('; ') : '';
+  const que = d.estado === 'a_revisar'
+    ? 'es un conteo de una versión anterior: no se sabe qué diferencia había al contar. Hoy cuadra con el libro.'
+    : `al contar la diferencia era ${numS(d.original)} y ahora cuadra.`;
   const motivo = await pedirMotivo('Confirmar explicación',
-    `<p><b>${esc(nomR(c.rodeoId))} · ${esc(nomC(c.categoriaId))}</b> al ${fFecha(c.fecha)}: al contar la diferencia era ${numS(d.original)} y ahora cuadra.</p>
+    `<p><b>${esc(nomR(c.rodeoId))} · ${esc(nomC(c.categoriaId))}</b> al ${fFecha(c.fecha)}: ${que}</p>
      <p class="chico">Confirmar no cambia el stock: deja escrito por qué cuadra. Revisá o cambiá el motivo.</p>`, false, sugerido);
   if (!motivo) return;
-  const m = nuevoMov({ tipo: 'ajuste', fecha: c.fecha, cantidad: 0, motivo, conteoId: c.id, destino: { rodeoId: c.rodeoId, categoriaId: c.categoriaId } });
+  // Se guarda qué movimientos se confirmaron: si después se anula alguno, la confirmación deja de valer.
+  const m = nuevoMov({ tipo: 'ajuste', fecha: c.fecha, cantidad: 0, motivo, conteoId: c.id, destino: { rodeoId: c.rodeoId, categoriaId: c.categoriaId }, extra: { confirma: ms.map((x) => x.id) } });
   if (await registrar([m])) { toast('Explicación confirmada'); render(); }
 }
 
@@ -611,18 +735,26 @@ async function anularConteo(id) {
   const motivo = await pedirMotivo('Anular conteo', `<p>${esc(nomR(c.rodeoId))} · ${esc(nomC(c.categoriaId))} · ${fFecha(c.fecha)} · contado ${num(c.cantidad)}.</p><p class="chico">No se borra: queda en la lista de conteos anulados, tachado, con el motivo.</p>`);
   if (!motivo) return;
   const n = { ...c, anulado: { fecha: new Date().toISOString(), motivo } };
-  try { await DB.guardar({ conteos: [n] }); } catch (e) { await aviso('No se pudo anular', `<p class="error">${esc(e?.message || e)}</p>`); return; }
+  try { await DB.guardar({ conteos: [n] }); } catch (e) { await aviso('No se pudo anular', `<p class="error">${mensajeError(e, 'db')}</p>`); return; }
   S.conteos = S.conteos.map((x) => (x.id === id ? n : x));
   toast('Conteo anulado'); render();
 }
 
 // =============== HISTORIAL ===============
 const RESUMEN_TIPOS = [['nacimiento', 'Nacimientos'], ['mortandad', 'Mortandad'], ['venta', 'Ventas'], ['ingreso', 'Ingresos / compras'], ['ajuste', 'Ajustes']];
+// El historial se recalcula solo si cambió el libro o el día.
+let histRef = null, histDia = null, histVal = null;
+function historial() {
+  const hoy = hoyIso();
+  if (histRef !== S.movimientos || histDia !== hoy) { histVal = L.historialMensual(S.movimientos, hoy).reverse(); histRef = S.movimientos; histDia = hoy; }
+  return histVal;
+}
 function vHistorial() {
-  const h = L.historialMensual(S.movimientos, hoyIso()).reverse();
+  const h = historial();
   if (!h.length) return '<h1>Historial mensual</h1><p>Todavía no hay movimientos.</p>';
   const cs = [...S.categorias].sort((a, b) => a.orden - b.orden);
-  const tarjetas = h.map((f) => {
+  // Se dibujan los últimos 24 meses; los anteriores, a pedido (con años de datos, dibujar todo traba el teléfono).
+  const tarjetas = h.slice(0, histVer).map((f) => {
     const mov = RESUMEN_TIPOS.filter(([k]) => f.resumen[k]).map(([k, n]) => `<div class="rc-fila"><span>${n}</span><span>${k === 'ajuste' ? numS(f.resumen[k]) : num(f.resumen[k])}</span></div>`).join('');
     const porCat = cs.map((c) => [c, f.porCategoria.get(c.id) || 0]).filter(([, v]) => v).map(([c, v]) => `<div class="rc-fila"><span>${esc(c.nombre)}</span><span class="${v < 0 ? 'neg' : ''}">${num(v)}</span></div>`).join('');
     return `<div class="tarjeta"><div class="rc-cab"><div><b>${fMes(f.mes)}</b><div class="chico">al ${fFecha(f.fecha)}</div></div><div class="rc-total">${num(f.total)}</div></div>
@@ -630,7 +762,8 @@ function vHistorial() {
       ${mov ? `<div class="hist-sub">Movimientos del mes</div>${mov}` : ''}
       ${porCat ? `<div class="hist-sub">Stock por categoría al cierre</div>${porCat}` : ''}</div>`;
   }).join('');
-  return `<h1>Historial mensual</h1><p class="chico">Stock al último día de cada mes (el mes en curso, con lo cargado hasta ahora). El saldo inicial no se cuenta como ingreso.</p>${tarjetas}`;
+  const mas = h.length > histVer ? `<button class="btn grande" data-acc="ver-mas-meses">Ver meses anteriores (${num(h.length - histVer)} más)</button>` : '';
+  return `<h1>Historial mensual</h1><p class="chico">Stock al último día de cada mes (el mes en curso, con lo cargado hasta ahora). El saldo inicial no se cuenta como ingreso.</p>${tarjetas}${mas}`;
 }
 
 // =============== MÁS ===============
@@ -655,7 +788,9 @@ function vMenu() {
 // ----- Informe -----
 const cssStr = (s) => '"' + String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ') + '"';
 
-function htmlInforme({ limiteDifs = Infinity } = {}) {
+// pantalla=true: vista previa en el teléfono. La planilla va en su propio recuadro deslizable y las
+// diferencias como lista (en una tabla de 6 columnas no entran a 360 px). Impreso y descargado: tablas.
+function htmlInforme({ limiteDifs = Infinity, pantalla = false } = {}) {
   const f = informeFecha || hoyIso();
   const P = S.parametros;
   const mapa = L.calcularStock(S.movimientos, f);
@@ -675,9 +810,10 @@ function htmlInforme({ limiteDifs = Infinity } = {}) {
     <div class="inf-titulo">Stock de hacienda al ${fFecha(f)}</div>
     <div>Emitido: ${emitido} · Total: <b>${num(t.total)}</b> cabezas · Vacas: <b>${num(vacasDe(t))}</b></div>
     <div class="pie">Calculado como suma de ${num(activos().filter((m) => m.fecha <= f).length)} movimientos registrados hasta el ${fFecha(f)}: nada se escribe a mano.${sinAnimales.length ? ` Sin animales: ${esc(sinAnimales.join(', '))}.` : ''}</div>
-    <div class="inf-tabla">${tabla}</div>
+    ${pantalla ? `<p class="chico">La hoja impresa es apaisada: deslizá la planilla de costado para ver todas las columnas →</p><div class="inf-tabla tabla-wrap">${tabla}</div>` : `<div class="inf-tabla">${tabla}</div>`}
     <h3>Diferencias de conteo sin explicar: ${num(difs.length)}${ambar ? ` · que cuadran sin confirmar: ${num(ambar)}` : ''}</h3>
-    ${difs.length ? `<table class="inf-difs"><thead><tr><th>Fecha</th><th>Rodeo</th><th>Categoría</th><th>Contado</th><th>Según el libro</th><th>Diferencia</th></tr></thead><tbody>${difs.slice(0, limiteDifs).map((d) => `<tr><td>${fFecha(d.conteo.fecha)}</td><td class="txt">${esc(nomR(d.conteo.rodeoId))}</td><td class="txt">${esc(nomC(d.conteo.categoriaId))}</td><td>${num(d.conteo.cantidad)}</td><td>${num(d.calculado)}</td><td><b>${numS(d.pendiente)}</b></td></tr>`).join('')}</tbody></table>${difs.length > limiteDifs ? `<p>Y ${num(difs.length - limiteDifs)} más: salen todas en el informe impreso o descargado.</p>` : ''}` : '<p>Ninguna.</p>'}
+    ${difs.length && pantalla ? `<div class="inf-difs-lista">${difs.slice(0, limiteDifs).map((d) => `<div class="inf-dif"><b>${esc(nomR(d.conteo.rodeoId))} · ${esc(nomC(d.conteo.categoriaId))}</b> · ${fFecha(d.conteo.fecha)}<br>Contado ${num(d.conteo.cantidad)} · Según el libro ${num(d.calculado)} · Diferencia <b>${numS(d.pendiente)}</b></div>`).join('')}</div>${difs.length > limiteDifs ? `<p>Y ${num(difs.length - limiteDifs)} más: salen todas en el informe impreso o descargado.</p>` : ''}`
+    : difs.length ? `<table class="inf-difs"><thead><tr><th>Fecha</th><th class="txt">Rodeo</th><th class="txt">Categoría</th><th>Contado</th><th>Según el libro</th><th>Diferencia</th></tr></thead><tbody>${difs.slice(0, limiteDifs).map((d) => `<tr><td>${fFecha(d.conteo.fecha)}</td><td class="txt">${esc(nomR(d.conteo.rodeoId))}</td><td class="txt">${esc(nomC(d.conteo.categoriaId))}</td><td>${num(d.conteo.cantidad)}</td><td>${num(d.calculado)}</td><td><b>${numS(d.pendiente)}</b></td></tr>`).join('')}</tbody></table>${difs.length > limiteDifs ? `<p>Y ${num(difs.length - limiteDifs)} más: salen todas en el informe impreso o descargado.</p>` : ''}` : '<p>Ninguna.</p>'}
   </div>`;
 }
 
@@ -686,7 +822,7 @@ function vInforme() {
     <div class="fecha-sesion"><label for="f-informe">Stock al:</label><input type="date" id="f-informe" value="${informeFecha || hoyIso()}"></div>
     <div class="fila-btns"><button class="btn prim" data-acc="imprimir">Imprimir / Guardar PDF</button><button class="btn" data-acc="descargar-informe">Descargar informe (HTML para imprimir)</button></div>
     <p class="chico">En el celular: "Imprimir" y después "Guardar como PDF". Si no aparece, usá "Descargar informe" y abrilo para imprimir.</p>
-    <div class="tabla-wrap vista-previa">${htmlInforme({ limiteDifs: 30 })}</div>`;
+    <div class="vista-previa">${htmlInforme({ limiteDifs: 30, pantalla: true })}</div>`;
 }
 
 async function cssTexto() {
@@ -903,7 +1039,10 @@ function vBackup() {
     <h2>Importar</h2>
     <p>Importar <b>reemplaza todo</b> lo que hay en este teléfono por lo del archivo. También sirve para el archivo de arranque.</p>
     <label class="btn grande" for="imp-archivo">Elegir archivo para importar</label>
-    <input type="file" id="imp-archivo" accept=".json,.xlsx,application/json" hidden>`;
+    <input type="file" id="imp-archivo" accept=".json,.xlsx,application/json" hidden>
+    ${S.respaldo ? `<h2>Deshacer la última importación</h2>
+    <p>Antes de importar, la app guardó lo que había en este teléfono${S.respaldo.fecha ? ` (el ${fFechaDe(S.respaldo.fecha)})` : ''}. Si la importación no era lo que querías, podés volver a eso.</p>
+    <button class="btn" data-acc="deshacer-imp">Deshacer última importación</button>` : ''}`;
 }
 
 function descargar(blob, nombre) {
@@ -918,10 +1057,46 @@ async function marcarBackup() { S.meta.ultimoBackup = new Date().toISOString(); 
 
 function estadoDatos() { return { rodeos: S.rodeos, categorias: S.categorias, movimientos: S.movimientos, conteos: S.conteos, parametros: S.parametros }; }
 
+// Un segundo toque que llega justo cuando termina una exportación no debe bajar otro archivo.
+const finExport = { json: 0, xlsx: 0 };
+const exportReciente = (k) => Date.now() - finExport[k] < 1500;
+
 async function exportarJson() {
-  const b = L.armarBackup(estadoDatos(), new Date().toISOString());
-  descargar(new Blob([JSON.stringify(b)], { type: 'application/json' }), `backup-stock-${sello()}.json`);
-  await marcarBackup(); toast('Backup exportado'); render();
+  if (exportReciente('json')) return;
+  await procesando('Armando el backup…');
+  try {
+    const b = L.armarBackup(estadoDatos(), new Date().toISOString());
+    descargar(new Blob(await jsonPorTandas(b), { type: 'application/json' }), `backup-stock-${sello()}.json`);
+    await marcarBackup();
+  } catch (e) { finProcesando(); await aviso('No se pudo exportar', `<p class="error">${mensajeError(e)}</p>`); return; }
+  finExport.json = Date.now(); finProcesando(); toast('Backup exportado'); render();
+}
+
+// JSON del backup armado de a tandas (miles de movimientos no congelan la pantalla). Da el mismo contenido
+// que JSON.stringify(b), partido en pedazos para el Blob.
+async function jsonPorTandas(b, tanda = 2000) {
+  const { movimientos, conteos, ...resto } = b;
+  const partes = [JSON.stringify(resto).slice(0, -1)];
+  for (const [k, lista] of [['movimientos', movimientos], ['conteos', conteos]]) {
+    partes.push(`,"${k}":[`);
+    for (let i = 0; i < lista.length; i += tanda) {
+      partes.push((i ? ',' : '') + lista.slice(i, i + tanda).map((x) => JSON.stringify(x)).join(','));
+      await ceder();
+    }
+    partes.push(']');
+  }
+  partes.push('}');
+  return partes;
+}
+
+// Arma filas de a tandas, devolviendo el control a la pantalla entre tanda y tanda (no se congela).
+async function filasPorTandas(lista, fn, tanda = 2000) {
+  const out = [];
+  for (let i = 0; i < lista.length; i += tanda) {
+    for (const x of lista.slice(i, i + tanda)) out.push(fn(x));
+    if (i + tanda < lista.length) await ceder();
+  }
+  return out;
 }
 
 // Excel: primero las columnas para leer (nombres), después las técnicas (ids) que sirven para reimportar exacto.
@@ -938,11 +1113,54 @@ function filaMov(m) {
   const tec = [m.id, m.fecha, m.tipo, m.cantidad, m.origen?.rodeoId ?? '', m.origen?.categoriaId ?? '', m.destino?.rodeoId ?? '', m.destino?.categoriaId ?? '', m.nota ?? '', m.caravana ?? '', m.motivo ?? '', m.conteoId ?? '', m.lote ?? '', m.creado ?? '', m.anulado?.fecha ?? '', m.anulado?.motivo ?? '', m.corrigeA ?? '', m.antes ? JSON.stringify(m.antes) : '', JSON.stringify(m.extra || {})];
   return [...leer, ...tec];
 }
-const celda = (v) => (typeof v === 'number' ? { value: v, type: Number } : typeof v === 'boolean' ? { value: v, type: Boolean } : { value: String(v ?? ''), type: String });
-const hoja = (nombre, cols, filas) => ({ sheet: nombre, data: [cols.map((c) => ({ value: c, fontWeight: 'bold' })), ...filas.map((f) => f.map(celda))] });
+// Excel en un Web Worker (excel-worker.js): comprimir o descomprimir miles de renglones no congela la pantalla.
+// Si el teléfono no puede abrir el worker, se hace acá mismo, como antes.
+let excelWorker = null, excelSeq = 0;
+const excelPend = new Map();
+function enWorkerExcel(op, datos) {
+  try {
+    if (!excelWorker) {
+      excelWorker = new Worker('excel-worker.js');
+      excelWorker.onmessage = (e) => { const p = excelPend.get(e.data.id); if (!p) return; excelPend.delete(e.data.id); if (e.data.ok) p.ok(e.data); else { const er = new Error(e.data.error); er.tipo = e.data.tipo; p.mal(er); } };
+      excelWorker.onerror = (e) => { e.preventDefault?.(); for (const p of excelPend.values()) p.mal(new Error('worker')); excelPend.clear(); excelWorker = null; };
+    }
+  } catch { excelWorker = null; return Promise.reject(new Error('worker')); }
+  const id = ++excelSeq;
+  return new Promise((ok, mal) => { excelPend.set(id, { ok, mal }); excelWorker.postMessage({ id, op, ...datos }); });
+}
+// Celdas: número, sí/no o texto, según el valor (lo arma el worker, o acá si no hay worker).
+const celdaExcel = (v) => (typeof v === 'number' ? { value: v, type: Number } : typeof v === 'boolean' ? { value: v, type: Boolean } : { value: String(v ?? ''), type: String });
+const hojaExcel = (h) => ({ sheet: h.sheet, data: [h.cols.map((c) => ({ value: c, fontWeight: 'bold' })), ...h.filas.map((f) => f.map(celdaExcel))] });
+// Las filas viajan al worker de a tandas (valores sueltos, no objetos): copiar miles de renglones de una vez
+// también congela la pantalla.
+async function escribirExcel(hojas, tanda = 2000) {
+  try {
+    await enWorkerExcel('nuevo', {});
+    for (let n = 0; n < hojas.length; n++) {
+      const filas = hojas[n].filas;
+      for (let i = 0; i < filas.length; i += tanda) {
+        if (!excelWorker) throw new Error('worker');
+        excelWorker.postMessage({ op: 'filas', n, filas: filas.slice(i, i + tanda) });
+        await ceder();
+      }
+    }
+    return (await enWorkerExcel('escribir', { hojas: hojas.map((h) => ({ sheet: h.sheet, cols: h.cols })) })).blob;
+  } catch (e) {
+    if (e.message !== 'worker') throw e;
+    return writeXlsxFile(hojas.map(hojaExcel)).toBlob();
+  }
+}
+const hoja = (nombre, cols, filas) => ({ sheet: nombre, cols, filas });
 
 async function exportarExcel() {
+  if (exportReciente('xlsx')) return;
   if (typeof writeXlsxFile === 'undefined') { toast('No se pudo cargar el módulo de Excel'); return; }
+  await procesando('Armando el Excel…');
+  try { await armarExcel(); } catch (e) { finProcesando(); await aviso('No se pudo exportar el Excel', `<p class="error">${mensajeError(e)}</p>`); return; }
+  finExport.xlsx = Date.now(); finProcesando(); toast('Excel exportado'); render();
+}
+
+async function armarExcel() {
   const b = L.armarBackup(estadoDatos(), new Date().toISOString());
   const hoy = hoyIso();
   const mapa = L.calcularStock(S.movimientos, hoy);
@@ -954,78 +1172,125 @@ async function exportarExcel() {
   const hojas = [
     hoja('Control', ['clave', 'valor'], [['app', b.app], ['formato', b.formato], ['exportado', b.exportado], ['movimientos', b.cuentas.movimientos], ['conteos', b.cuentas.conteos], ['rodeos', b.cuentas.rodeos], ['categorias', b.cuentas.categorias]]),
     hoja('Stock actual', ['Rodeo', ...cs.map((c) => c.nombre), 'Total'], stockFilas),
-    hoja('Movimientos', [...COL_MOV_LEER, ...COL_MOV], S.movimientos.map(filaMov)),
+    hoja('Movimientos', [...COL_MOV_LEER, ...COL_MOV], await filasPorTandas(S.movimientos, filaMov)),
     hoja('Conteos', [...COL_CON_LEER, ...COL_CON], S.conteos.map((c) => [fFecha(c.fecha), nomR(c.rodeoId), nomC(c.categoriaId), c.cantidad, c.origen ?? '', c.anulado ? fFechaDe(c.anulado.fecha) : '',
       c.id, c.fecha, c.rodeoId, c.categoriaId, c.cantidad, c.origen ?? '', c.nota ?? '', c.creado ?? '', c.anulado?.fecha ?? '', c.anulado?.motivo ?? '', c.diferenciaOriginal ?? '', c.calculadoAlContar ?? ''])),
     hoja('Rodeos', COL_ROD, S.rodeos.map((r) => [r.id, r.nombre, r.ubicacion ?? '', r.orden, !!r.activo])),
     hoja('Categorias', COL_CAT, S.categorias.map((c) => [c.id, c.nombre, c.orden, !!c.activa, !!c.cuentaComoVaca, c.senasa ?? ''])),
     hoja('Parametros', ['clave', 'valor_json'], Object.entries(S.parametros).map(([k, v]) => [k, JSON.stringify(v)])),
   ];
-  const blob = await writeXlsxFile(hojas).toBlob();
+  await ceder();
+  const blob = await escribirExcel(hojas);
   descargar(blob, `stock-${sello()}.xlsx`);
-  await marcarBackup(); toast('Excel exportado'); render();
+  await marcarBackup();
 }
 
 // Lee un .xlsx exportado por esta app y lo convierte en backup (usa las columnas técnicas).
+// Todo el trabajo (descomprimir, leer y convertir) se hace en el worker; vuelve como texto JSON.
+const ERR_EXCEL_ABRIR = 'No se pudo abrir el Excel: el archivo está dañado o no es un Excel (.xlsx).';
+const ERR_EXCEL_FORMATO = 'El Excel no tiene el formato de esta app: alguna columna técnica (las de la derecha) está vacía, dañada o fue editada.';
 async function excelABackup(file) {
-  const hojas = await readXlsxFile(file);
-  const porNombre = Object.fromEntries(hojas.map((h) => [h.sheet, h.data]));
-  const objs = (nombre) => {
-    const d = porNombre[nombre]; if (!d) throw new Error(`Falta la hoja "${nombre}": no parece un Excel exportado por esta app`);
-    const [cab, ...filas] = d;
-    // Si una columna aparece dos veces (legible y técnica con el mismo nombre), gana la técnica (la última).
-    return filas.map((f) => { const o = {}; cab.forEach((c, i) => { o[c] = f[i] ?? ''; }); return o; });
-  };
-  const s = (v) => (v === null || v === undefined ? '' : String(v));
-  const n = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
-  const ctrl = Object.fromEntries(objs('Control').map((o) => [o.clave, o.valor]));
-  const movimientos = objs('Movimientos').map((o) => ({
-    id: s(o.id), fecha: s(o.fecha), tipo: s(o.tipo), cantidad: n(o.cantidad),
-    origen: o.origen_rodeo_id ? { rodeoId: s(o.origen_rodeo_id), categoriaId: s(o.origen_categoria_id) } : null,
-    destino: o.destino_rodeo_id ? { rodeoId: s(o.destino_rodeo_id), categoriaId: s(o.destino_categoria_id) } : null,
-    nota: s(o.nota), caravana: s(o.caravana), motivo: s(o.motivo), conteoId: s(o.conteo_id) || null, lote: s(o.lote) || null, creado: s(o.creado),
-    anulado: o.anulado_fecha ? { fecha: s(o.anulado_fecha), motivo: s(o.anulado_motivo) } : null, corrigeA: s(o.corrige_a) || null,
-    antes: o.antes_json ? JSON.parse(s(o.antes_json)) : null,
-    extra: o.extra_json ? JSON.parse(s(o.extra_json)) : {},
-  }));
-  const conteos = objs('Conteos').map((o) => {
-    const c = { id: s(o.id), fecha: s(o.fecha), rodeoId: s(o.rodeo_id), categoriaId: s(o.categoria_id), cantidad: n(o.cantidad), origen: s(o.origen), nota: s(o.nota), creado: s(o.creado), anulado: o.anulado_fecha ? { fecha: s(o.anulado_fecha), motivo: s(o.anulado_motivo) } : null };
-    if (s(o.diferencia_original) !== '') c.diferenciaOriginal = n(o.diferencia_original);
-    if (s(o.calculado_al_contar) !== '') c.calculadoAlContar = n(o.calculado_al_contar);
-    return c;
-  });
-  const bool = (v) => v === true || v === 'true' || v === 1 || v === 'TRUE';
-  const rodeos = objs('Rodeos').map((o) => ({ id: s(o.id), nombre: s(o.nombre), ubicacion: s(o.ubicacion), orden: Number(o.orden), activo: bool(o.activo) }));
-  const categorias = objs('Categorias').map((o) => ({ id: s(o.id), nombre: s(o.nombre), orden: Number(o.orden), activa: bool(o.activa), cuentaComoVaca: bool(o.cuenta_como_vaca), senasa: s(o.senasa) }));
-  const parametros = Object.fromEntries(objs('Parametros').map((o) => [s(o.clave), JSON.parse(s(o.valor_json))]));
-  return { app: s(ctrl.app), formato: Number(ctrl.formato), exportado: s(ctrl.exportado),
-    cuentas: { movimientos: Number(ctrl.movimientos), conteos: Number(ctrl.conteos), rodeos: Number(ctrl.rodeos), categorias: Number(ctrl.categorias) },
-    rodeos, categorias, movimientos, conteos, parametros };
+  let r;
+  try { r = await enWorkerExcel('leerBackup', { file }); } catch (e) {
+    if (e.message !== 'worker') {
+      if (e.tipo === 'abrir') throw new ErrorUsuario(ERR_EXCEL_ABRIR);
+      if (e.tipo === 'usuario') throw new ErrorUsuario(e.message);
+      throw new ErrorUsuario(ERR_EXCEL_FORMATO);
+    }
+    let hojas;
+    try { hojas = await readXlsxFile(file); } catch { throw new ErrorUsuario(ERR_EXCEL_ABRIR); }
+    try { return self.excelHojasABackup(hojas); } catch (e2) { throw new ErrorUsuario(e2.usuario ? e2.message : ERR_EXCEL_FORMATO); }
+  }
+  await ceder();
+  return JSON.parse(r.json);
 }
 
 async function importar(file) {
-  let b;
+  const esExcel = /\.xlsx$/i.test(file.name);
+  let b, v, tot;
+  await procesando('Leyendo el archivo…');
   try {
-    if (/\.xlsx$/i.test(file.name)) b = await excelABackup(file);
-    else b = JSON.parse(await file.text());
-  } catch (e) {
-    await aviso('No se pudo leer el archivo', `<p class="error">${esc(e?.message || e)}</p><p>No se importó nada; tus datos siguen como estaban.</p>`); return;
+    try {
+      if (esExcel) b = await excelABackup(file);
+      else { const txt = await file.text(); await ceder(); b = JSON.parse(txt); }
+    } catch (e) {
+      finProcesando();
+      await aviso('No se pudo leer el archivo', `<p class="error">${mensajeError(e, esExcel ? 'xlsx' : 'json')}</p><p>No se importó nada; tus datos siguen como estaban.</p>`); return;
+    }
+    await ceder();
+    try { v = await L.validarBackupEnTandas(b, ceder); } catch (e) { v = { ok: false, errores: ['El archivo tiene un formato inesperado: no es un backup de esta app o está dañado.'] }; }
+    if (v.ok) {
+      // Conteos de backups viejos: se reconstruye la diferencia al contar (o quedan "a revisar").
+      await ceder();
+      v.estado.conteos = L.migrarConteos(v.estado.conteos, v.estado.movimientos).conteos;
+      await ceder();
+      tot = L.totales(L.calcularStock(v.estado.movimientos)).total;
+    }
+  } finally { finProcesando(); }
+  if (!v.ok) {
+    await aviso('El archivo tiene problemas', `<p>Encontré ${num(v.total || v.errores.length)} problema${(v.total || v.errores.length) === 1 ? '' : 's'}${(v.total || 0) > L.MAX_ERRORES ? `; estos son los primeros ${L.MAX_ERRORES}` : ''}:</p><ul>${v.errores.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><p>No se importó nada; tus datos siguen como estaban.</p>`); return;
   }
-  let v;
-  try { v = L.validarBackup(b); } catch (e) { v = { ok: false, errores: ['El archivo tiene un formato inesperado: ' + (e?.message || e)] }; }
-  if (!v.ok) { await aviso('El archivo tiene problemas', `<ul>${v.errores.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><p>No se importó nada; tus datos siguen como estaban.</p>`); return; }
-  const tot = L.totales(L.calcularStock(v.estado.movimientos)).total;
   const ok = await confirmar('Importar backup', `<p>El archivo es del ${b.exportado ? fFechaDe(b.exportado) : '?'} y trae ${num(v.estado.movimientos.length)} movimientos y ${num(v.estado.conteos.length)} conteos. Stock total: <b>${num(tot)}</b>.</p>
     <p class="error">Esto reemplaza lo que hay en este teléfono (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(L.calcularStock(S.movimientos)).total)}).</p>`, 'Reemplazar todo');
   if (!ok) return;
-  const meta = { ...S.meta, ultimoBackup: b.exportado || S.meta.ultimoBackup || null };
+  // Recién importado, lo que hay en el teléfono es igual al archivo: ese archivo ya es el backup al día.
+  // El aviso de 7 días cuenta desde hoy, no desde la fecha en que se exportó el archivo (p. ej., el de arranque).
+  const meta = { ...S.meta, ultimoBackup: new Date().toISOString() };
+  await procesando('Importando…');
+  const parametros = { ...PARAMETROS_INICIALES, ...v.estado.parametros };
   try {
-    await DB.reemplazarTodo(v.estado, { parametros: { ...PARAMETROS_INICIALES, ...v.estado.parametros }, meta });
+    await DB.reemplazarTodo(v.estado, { parametros, meta }, { respaldar: true });
   } catch (e) {
-    await aviso('No se pudo importar', `<p class="error">${esc(e?.message || e)}</p><p>No se importó nada; tus datos siguen como estaban.</p>`); return;
+    await falloReemplazo(e, 'No se pudo importar', 'No se importó nada');
+    return;
   }
-  await cargarEstado();
+  try { await cargarEstado({ ...v.estado, parametros, meta }); } finally { finProcesando(); }
+  await actualizarRespaldo();
   toast('Backup importado'); ir('stock');
+}
+
+// Un reemplazo total que falló. Solo se dice "tus datos siguen como estaban" si la base confirmó que
+// deshizo todo (evento abort). Si no hay esa confirmación, se vuelve a leer lo que de verdad quedó guardado.
+async function falloReemplazo(e, titulo, nadaTxt) {
+  if (e && e.abortado) {
+    finProcesando();
+    await aviso(titulo, `<p class="error">${mensajeError(e, 'db')}</p><p>${nadaTxt}; tus datos siguen como estaban.</p>`);
+    return;
+  }
+  try { await cargarEstado(); } catch { /* se informa abajo */ }
+  finProcesando();
+  await actualizarRespaldo();
+  await aviso(titulo, `<p class="error">${mensajeError(e, 'db')}</p><p>No se pudo confirmar si se escribió algo. La pantalla ahora muestra lo que quedó guardado en el teléfono${S.respaldo ? '; si algo falta, usá <b>Deshacer última importación</b> en Backup' : ''}.</p>`);
+  render();
+}
+
+async function actualizarRespaldo() {
+  try {
+    if (!(await DB.hayRespaldo())) { S.respaldo = null; return; }
+    const r = await DB.leerRespaldo();
+    S.respaldo = r ? { fecha: r.fecha, movimientos: r.datos?.movimientos?.length || 0 } : null;
+  } catch { S.respaldo = null; }
+}
+
+async function deshacerImportacion() {
+  let r;
+  try { r = await DB.leerRespaldo(); } catch (e) { await aviso('No se pudo leer la copia', `<p class="error">${mensajeError(e, 'db')}</p>`); return; }
+  if (!r || !r.datos) { S.respaldo = null; await aviso('No hay nada para deshacer', '<p>No hay una copia de antes de importar.</p>'); render(); return; }
+  const d = r.datos;
+  const tot = L.totales(L.calcularStock(d.movimientos || [])).total;
+  const ok = await confirmar('Deshacer última importación', `<p>Vuelve a lo que había en este teléfono antes de importar${r.fecha ? ` (el ${fFechaDe(r.fecha)})` : ''}: ${num((d.movimientos || []).length)} movimientos y ${num((d.conteos || []).length)} conteos. Stock total: <b>${num(tot)}</b>.</p>
+    <p class="error">Lo que hay ahora (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(L.calcularStock(S.movimientos)).total)}) se reemplaza. Si lo querés conservar, exportalo antes.</p>`, 'Deshacer importación');
+  if (!ok) return;
+  await procesando('Volviendo a los datos anteriores…');
+  try {
+    await DB.reemplazarTodo(d, d.kv || {}, { respaldar: false, borrarRespaldo: true });
+  } catch (e) {
+    await falloReemplazo(e, 'No se pudo deshacer', 'No se cambió nada');
+    return;
+  }
+  try { await cargarEstado(); } finally { finProcesando(); }
+  S.respaldo = null;
+  toast('Importación deshecha'); ir('stock');
 }
 
 // ---------- Eventos ----------
@@ -1041,7 +1306,7 @@ document.addEventListener('click', async (e) => {
   }
   if (ds.atajo) { const a = atajo(ds.atajo); C = nuevaCarga(); C.tipo = 'cambio_categoria'; C.atajo = a.id; C.catO = a.catO; C.paso = 'rodeo'; render(); return; }
   if (ds.rodeo) {
-    if (ds.campo === 'conteo') { CT.rodeo = ds.rodeo; CT.fecha = $('#f-conteo')?.value || CT.fecha; render(); return; }
+    if (ds.campo === 'conteo') { CT.rodeo = ds.rodeo; CT.vals = {}; CT.fecha = $('#f-conteo')?.value || CT.fecha; render(); return; }
     if (ds.campo === 'rodeoO') {
       C.rodeoO = ds.rodeo;
       C.paso = C.tipo === 'traslado' ? 'destino' : (C.tipo === 'cambio_categoria' && !C.atajo) ? 'catO' : 'cant';
@@ -1074,23 +1339,26 @@ document.addEventListener('click', async (e) => {
   if (ds.orden) { mover(ds.orden, ds.id, Number(ds.dir)); return; }
   switch (ds.acc) {
     case 'atras': atras(); break;
-    case 'guardar': guardarCarga(); break;
+    case 'guardar': unaVez(guardarCarga); break;
     case 'seguir-fecha': S.meta.fechaSesion = S.meta.fechaSesionAnterior; S.meta.fechaSesionDia = hoyIso(); delete S.meta.fechaSesionAnterior; await guardarMeta(); toast('Fecha de carga: ' + fFecha(S.meta.fechaSesion)); render(); break;
-    case 'nuevo-conteo': CT = { modo: 'nuevo', fecha: fechaSesion() }; render(); break;
+    case 'nuevo-conteo': CT = { modo: 'nuevo', fecha: fechaSesion(), fechaDia: hoyIso() }; render(); break;
+    case 'seguir-fecha-conteo': leerConteoVisibles(); CT.fecha = CT.fechaAnterior; CT.fechaDia = hoyIso(); delete CT.fechaAnterior; toast('Fecha del conteo: ' + fFecha(CT.fecha)); render(); break;
     case 'conteo-cancelar': CT = { modo: 'lista' }; render(); break;
     case 'conteo-atras': CT.rodeo = null; render(); break;
-    case 'guardar-conteo': guardarConteo(); break;
+    case 'guardar-conteo': unaVez(guardarConteo); break;
     case 'imprimir': prepararImpresion(); window.print(); break;
     case 'descargar-informe': descargarInforme(); break;
     case 'ver-mas': movsVer += 50; render(); break;
     case 'ver-mas-conteos': conteosVer += 50; render(); break;
     case 'ver-mas-anulados': anuladosVer += 50; render(); break;
     case 'ver-mas-abiertas': abiertasVer += 50; render(); break;
+    case 'ver-mas-meses': histVer += 24; render(); break;
     case 'agregar-rodeo': agregar('rodeo'); break;
     case 'agregar-cat': agregar('cat'); break;
-    case 'cargar-saldo': cargarSaldo(); break;
-    case 'exp-json': exportarJson(); break;
-    case 'exp-xlsx': exportarExcel(); break;
+    case 'cargar-saldo': unaVez(cargarSaldo); break;
+    case 'exp-json': unaVez(exportarJson); break;
+    case 'deshacer-imp': unaVez(deshacerImportacion); break;
+    case 'exp-xlsx': unaVez(exportarExcel); break;
   }
 });
 
@@ -1123,7 +1391,7 @@ document.addEventListener('change', async (e) => {
   }
   if (el.id === 'f-stock') { stockFecha = el.value || hoyIso(); render(); return; }
   if (el.id === 'f-informe') { informeFecha = el.value || hoyIso(); render(); return; }
-  if (el.id === 'f-conteo') { CT.fecha = el.value; return; }
+  if (el.id === 'f-conteo') { CT.fecha = el.value; CT.fechaDia = hoyIso(); delete CT.fechaAnterior; return; }
   if (el.dataset.cfg) { cambiarCfg(el); return; }
   if (el.dataset.param) { cambiarParam(el); return; }
   if (el.id === 'imp-archivo' && el.files[0]) { const f = el.files[0]; el.value = ''; importar(f); }
@@ -1132,16 +1400,17 @@ document.addEventListener('change', async (e) => {
 // Enter en una casilla de cantidad = guardar (ahorra un toque con teclado numérico que tiene "Ir").
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
-  if (e.target.matches('[data-cant], #c-caravana')) { e.preventDefault(); guardarCarga(); }
-  else if (e.target.matches('[data-ccant]')) { e.preventDefault(); guardarConteo(); }
+  if (e.target.matches('[data-cant], #c-caravana')) { e.preventDefault(); unaVez(guardarCarga); }
+  else if (e.target.matches('[data-ccant]')) { e.preventDefault(); unaVez(guardarConteo); }
 });
 
 // Imprimir desde el menú del navegador (Ctrl+P, Compartir → Imprimir): siempre con los datos de este momento.
 window.addEventListener('beforeprint', prepararImpresion);
 
 // ---------- Arranque ----------
-async function cargarEstado() {
-  const d = await DB.leerTodo();
+async function cargarEstado(datos = null) {
+  // Después de importar se usa lo que ya está en memoria (recién escrito en una sola transacción): no hace falta volver a leerlo.
+  const d = datos || await DB.leerTodo();
   const semilla = {};
   if (!d.rodeos.length && !d.categorias.length) { semilla.rodeos = RODEOS_INICIALES; semilla.categorias = CATEGORIAS_INICIALES; }
   if (!d.parametros) semilla.kv = { parametros: PARAMETROS_INICIALES };
@@ -1151,15 +1420,26 @@ async function cargarEstado() {
   S.movimientos = d.movimientos; S.conteos = d.conteos;
   S.parametros = { ...PARAMETROS_INICIALES, ...(d.parametros || {}) };
   S.meta = d.meta || {};
-  // D2: si la fecha de carga se fijó otro día, vuelve a hoy (con un botón para seguir con la planilla anterior).
-  const hoy = hoyIso();
-  if (S.meta.fechaSesion && S.meta.fechaSesionDia !== hoy && S.meta.fechaSesion !== hoy) {
-    S.meta.fechaSesionAnterior = S.meta.fechaSesion;
-    delete S.meta.fechaSesion;
-    S.meta.fechaSesionDia = hoy;
-    await guardarMeta();
-  }
+  // Conteos de backups viejos (v0.1): se reconstruye la diferencia del momento de contar (D1).
+  const mig = L.migrarConteos(S.conteos, S.movimientos);
+  if (mig.cambiados.length) { S.conteos = mig.conteos; await DB.guardar({ conteos: mig.cambiados }); }
+  if (revisarFechaSesion()) await guardarMeta();
 }
+
+// Al volver a la app (estaba en segundo plano, o abierta desde ayer): revisar la fecha de carga.
+function alVolver() {
+  if (!S.meta) return;
+  const enConteo = S.vista === 'conteos' && CT.modo === 'nuevo';
+  if (enConteo) leerConteoVisibles();
+  const a = revisarFechaSesion();
+  const b = revisarFechaConteo();
+  if (!a && !b) return;
+  if (S.vista === 'cargar' && C.paso === 'cant') leerCantVisibles();
+  guardarMeta(); render();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') alVolver(); });
+window.addEventListener('pageshow', alVolver);
+window.addEventListener('focus', alVolver);
 
 async function iniciar() {
   try {
@@ -1170,6 +1450,8 @@ async function iniciar() {
   }
   render();
   S.persistido = await DB.pedirPersistencia();
+  await actualizarRespaldo();
+  if (S.vista === 'mas' && S.sub === 'backup') render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

@@ -42,7 +42,7 @@ export const PARAMETROS_INICIALES = {
   renspa: '',
   cuit: '',
   mostrarCuitEnInforme: false,
-  vacasDeclaradas: '',            // 1.030 vs 1.276: a confirmar
+  vacasDeclaradas: '',            // cifra oficial: a confirmar
   paricionDesde: '',              // mayo o junio: a confirmar
   paricionHasta: '',              // agosto o septiembre: a confirmar
   porcentajeToros: '',            // 3, 3,5 o 4: a confirmar
