@@ -184,3 +184,37 @@ td .ubic { display: block; font-size: 16px; color: var(--gris); }
   .hoja tr { break-inside: avoid; }
   .hoja h3 { break-after: avoid; }
 }
+
+/* ---- v0.3 ---- */
+#procesando { position: fixed; inset: 0; z-index: 70; background: rgba(16,36,27,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+#procesando[hidden] { display: none; }
+.caja-proc { background: #fff; border-radius: 14px; padding: 20px 18px; max-width: 360px; width: 100%; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.ruedita { width: 44px; height: 44px; border-radius: 50%; border: 6px solid var(--vp); border-top-color: var(--v); animation: girar 0.9s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ruedita { animation: none; } }
+.lista-neg { margin: 6px 0; padding-left: 22px; }
+.chico-aviso { font-size: 16px; font-weight: normal; }
+.detalle-tec { margin-top: 8px; font-weight: normal; color: var(--gris); font-size: 16px; }
+.detalle-tec summary { min-height: 48px; color: var(--gris); }
+.linea-orig { margin: 4px 0; }
+.dif.a_revisar .estado { color: var(--rojo); }
+.rc-total.neg { color: var(--rojo); }
+.vista-previa .hoja { overflow-wrap: anywhere; }
+.vista-previa .inf-tabla.tabla-wrap { margin: 6px 0; }
+.vista-previa .hoja .tabla-wrap th, .vista-previa .hoja .tabla-wrap td { white-space: nowrap; }
+.vista-previa .hoja .tabla-wrap th { white-space: normal; min-width: 64px; }
+.inf-dif { border: 1px solid #555; border-radius: 6px; padding: 8px 10px; margin: 6px 0; }
+.conf-vieja { color: #666; }
+.conf-vieja s { color: #666; }
+
+/* Contador de caracteres debajo de las casillas de Datos */
+.contador { display: block; font-size: 16px; color: var(--gris); margin-top: 4px; }
+
+/* v0.4: categorías plegadas, totales en vivo del saldo inicial, vista previa de la plantilla */
+details.otras { border-style: dashed; }
+details.otras summary { min-height: 48px; display: flex; align-items: center; font-weight: bold; cursor: pointer; }
+.total-vivo { position: sticky; top: 0; z-index: 2; background: var(--vp); border: 2px solid var(--v); border-radius: 10px; padding: 10px 12px; font-size: 20px; margin: 10px 0; }
+.fila-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: baseline; }
+.tabla-mini { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.tabla-mini td { padding: 6px 4px; border-bottom: 1px solid #ccc; overflow-wrap: anywhere; }
+.tabla-mini td.n { text-align: right; white-space: nowrap; }
