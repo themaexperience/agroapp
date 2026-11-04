@@ -2,7 +2,8 @@
 // Sin DOM ni IndexedDB: corre igual en el navegador y en Node (tests).
 // Principio: el stock NUNCA se guarda; siempre es la suma de movimientos no anulados.
 
-export const FORMATO_VERSION = 1;
+// 1 = v0.1–v0.3 (categorías del papel). 2 = v0.4 (categorías SENASA; listo para caravanas de la fase 2).
+export const FORMATO_VERSION = 2;
 
 // Cada tipo dice qué lados usa. "origen" resta, "destino" suma.
 export const TIPOS = {
@@ -61,8 +62,16 @@ export function validarMovimiento(m) {
   if (m.tipo === 'cambio_categoria' && m.origen && m.destino && m.origen.categoriaId === m.destino.categoriaId) {
     e.push('En un cambio de categoría la categoría tiene que ser distinta');
   }
+  if (!listaCaravanasOk(m.caravanas)) e.push('La lista de caravanas está dañada');
   return e;
 }
+
+// Fase 2 (caravanas): lista opcional de números de caravana (texto). Todavía no tiene pantallas.
+export const MAX_CARAVANAS = 5000, MAX_LARGO_CARAVANA = 40;
+export const listaCaravanasOk = (x) => x === undefined || x === null
+  || (Array.isArray(x) && x.length <= MAX_CARAVANAS && x.every((c) => typeof c === 'string' && c.trim() !== '' && c.length <= MAX_LARGO_CARAVANA));
+// Cómo se contó (fase 2). El texto libre de siempre sigue en conteo.origen.
+export const METODOS_CONTEO = ['a ojo', 'manga', 'bastón'];
 
 export const activo = (m) => !m.anulado;
 
@@ -176,32 +185,93 @@ export const ladoAjuste = (m) => m.destino || m.origen;
 // Por cada celda rodeo×categoría: fechas ordenadas y saldo acumulado. "Stock de una celda a una fecha"
 // sale por búsqueda binaria: O(log n) en vez de recorrer todo el libro. Se arma una vez por cambio del libro.
 export function construirIndice(movimientos) {
-  const tmp = new Map();
-  const add = (k, f, d) => { let mf = tmp.get(k); if (!mf) { mf = new Map(); tmp.set(k, mf); } mf.set(f, (mf.get(f) || 0) + d); };
-  for (const m of movimientos) {
-    if (m.anulado) continue;
-    if (m.origen) add(clave(m.origen.rodeoId, m.origen.categoriaId), m.fecha, -m.cantidad);
-    if (m.destino) add(clave(m.destino.rodeoId, m.destino.categoriaId), m.fecha, m.cantidad);
-  }
+  const deltas = new Map(); // clave -> Map fecha -> delta del día
+  for (const m of movimientos) if (!m.anulado) sumarMov(deltas, m, 1);
   const porClave = new Map();
-  for (const [k, mf] of tmp) {
-    const fechas = [...mf.keys()].sort();
-    const acum = new Array(fechas.length);
-    let s = 0;
-    for (let i = 0; i < fechas.length; i++) { s += mf.get(fechas[i]); acum[i] = s; }
-    porClave.set(k, { fechas, acum });
+  for (const [k, mf] of deltas) porClave.set(k, entradaDesde(mf));
+  return indiceDesde(porClave);
+}
+
+// Suma (signo +1) o resta (−1) un movimiento en un Map clave -> Map fecha -> delta.
+function sumarMov(deltas, m, signo) {
+  const add = (k, d) => { let mf = deltas.get(k); if (!mf) { mf = new Map(); deltas.set(k, mf); } mf.set(m.fecha, (mf.get(m.fecha) || 0) + d); };
+  if (m.origen) add(clave(m.origen.rodeoId, m.origen.categoriaId), -signo * m.cantidad);
+  if (m.destino) add(clave(m.destino.rodeoId, m.destino.categoriaId), signo * m.cantidad);
+}
+
+// Entrada de una celda: fechas ordenadas, saldo acumulado a cada fecha, y el mínimo (para avisar negativos).
+function entradaDesde(mf) {
+  const fechas = [...mf.keys()].sort();
+  const acum = new Array(fechas.length);
+  let s = 0, min = 0, primeraNegativa = null, saldoEnNegativa = null;
+  for (let i = 0; i < fechas.length; i++) {
+    s += mf.get(fechas[i]); acum[i] = s;
+    if (s < min) min = s;
+    if (s < 0 && primeraNegativa === null) { primeraNegativa = fechas[i]; saldoEnNegativa = s; }
   }
+  return { deltas: mf, fechas, acum, min, primeraNegativa, saldoEnNegativa };
+}
+
+function indiceDesde(porClave) {
   return {
     porClave,
     stockA(k, f = null) {
       const e = porClave.get(k);
       if (!e) return 0;
-      if (f === null) return e.acum[e.acum.length - 1];
-      let lo = 0, hi = e.fechas.length - 1, r = -1;
-      while (lo <= hi) { const mid = (lo + hi) >> 1; if (e.fechas[mid] <= f) { r = mid; lo = mid + 1; } else hi = mid - 1; }
+      const r = posHasta(e, f);
       return r < 0 ? 0 : e.acum[r];
     },
+    // Stock de todas las celdas a una fecha (mismo resultado que calcularStock, sin recorrer los movimientos).
+    stockMapa(f = null) {
+      const mapa = new Map();
+      for (const [k, e] of porClave) { const r = posHasta(e, f); if (r >= 0) mapa.set(k, e.acum[r]); }
+      return mapa;
+    },
   };
+}
+function posHasta(e, f) {
+  if (f === null || f === undefined) return e.fechas.length - 1;
+  let lo = 0, hi = e.fechas.length - 1, r = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (e.fechas[mid] <= f) { r = mid; lo = mid + 1; } else hi = mid - 1; }
+  return r;
+}
+
+// Celdas afectadas por un cambio (quitar: movimientos que dejan de contar; agregar: los nuevos), recalculadas
+// a partir del índice actual sin recorrer todo el libro. Devuelve Map clave -> entrada nueva.
+function entradasCambiadas(idx, quitar, agregar) {
+  const tocadas = new Map();
+  const copia = (k) => { let mf = tocadas.get(k); if (!mf) { mf = new Map(idx.porClave.get(k)?.deltas || []); tocadas.set(k, mf); } return mf; };
+  const aplicarA = (m, signo) => {
+    for (const [lado, sg] of [[m.origen, -1], [m.destino, 1]]) {
+      if (!lado) continue;
+      const mf = copia(clave(lado.rodeoId, lado.categoriaId));
+      mf.set(m.fecha, (mf.get(m.fecha) || 0) + sg * signo * m.cantidad);
+    }
+  };
+  for (const m of quitar) if (!m.anulado) aplicarA(m, -1);
+  for (const m of agregar) if (!m.anulado) aplicarA(m, 1);
+  const res = new Map();
+  for (const [k, mf] of tocadas) { for (const [f, d] of mf) if (d === 0) mf.delete(f); res.set(k, entradaDesde(mf)); }
+  return res;
+}
+
+// Índice nuevo después de un cambio (comparte las celdas que no cambiaron). El índice viejo no se toca.
+export function indiceConCambios(idx, quitar, agregar) {
+  const porClave = new Map(idx.porClave);
+  for (const [k, e] of entradasCambiadas(idx, quitar, agregar)) { if (e.fechas.length) porClave.set(k, e); else porClave.delete(k); }
+  return indiceDesde(porClave);
+}
+
+// Igual que negativosPorCambio, pero usando el índice: solo mira las celdas que el cambio toca.
+export function negativosPorCambioIdx(idx, quitar, agregar) {
+  const out = [];
+  for (const [k, d] of entradasCambiadas(idx, quitar, agregar)) {
+    if (d.min >= 0) continue;
+    const a = idx.porClave.get(k);
+    if (a && a.min <= d.min) continue; // ya estaba igual o peor: no lo empeora este cambio
+    out.push({ ...desarmarClave(k), fecha: d.primeraNegativa, saldo: d.saldoEnNegativa, minimo: d.min });
+  }
+  return out;
 }
 
 // ---- Conteos y diferencias ----
@@ -464,6 +534,7 @@ export function armarBackup(estado, ahoraIso) {
     movimientos: estado.movimientos,
     conteos: estado.conteos,
     parametros: estado.parametros,
+    caravanas: [], // fase 2: registro de caravanas por rodeo (todavía vacío)
   };
 }
 
@@ -473,7 +544,95 @@ export function armarBackup(estado, ahoraIso) {
 // fechas, referencias a rodeos y categorías, vínculos entre renglones). Si hay problemas, no se escribe nada.
 // Se informan los primeros MAX_ERRORES, en castellano, diciendo qué renglón y por qué.
 export const MAX_ERRORES = 5;
-const esId = (x) => typeof x === 'string' && x.trim() !== '';
+// Identificador: solo letras, números y _ . : - (así nunca puede romper el HTML ni la clave rodeo|categoría).
+const RE_ID = /^[A-Za-z0-9_.:-]{1,100}$/;
+const esId = (x) => typeof x === 'string' && RE_ID.test(x);
+// Fecha y hora ISO (marcas de anulado, creado, etc.).
+export const esFechaHora = (x) => typeof x === 'string' && x.length <= 40 && !Number.isNaN(Date.parse(x));
+
+// Esquema de parámetros: tipo de cada uno. Lo desconocido se acepta solo si es texto, número o sí/no.
+export const ESQUEMA_PARAMETROS = {
+  empresa: 'texto', campo: 'texto', localidad: 'texto', renspa: 'texto', cuit: 'texto',
+  mostrarCuitEnInforme: 'si_no',
+  vacasDeclaradas: 'texto', paricionDesde: 'texto', paricionHasta: 'texto', porcentajeToros: 'texto',
+  queEsEnfrente: 'texto', potreros: 'texto_largo', motivosAjuste: 'lista',
+  servicio: 'texto', inseminacion: 'texto', tacto: 'texto', destete: 'texto', yerra: 'texto',
+  paseTerneros: 'texto', paseToro: 'texto', entoreVaquillonas: 'texto',
+};
+export const MAX_TEXTO = 300, MAX_TEXTO_LARGO = 5000, MAX_LISTA = 50;
+// Ajusta un parámetro a su tipo. Lo que es del tipo correcto pero demasiado largo se RECORTA (nunca se vacía):
+// devuelve { ok, valor, recorte } con recorte = { de, a } (caracteres o renglones) si hubo que cortar.
+// Recorta un texto a "max" unidades sin partir un carácter doble (emoji): si el corte cae en el medio, corta uno antes.
+export function recortarTexto(txt, max) {
+  if (txt.length <= max) return txt;
+  const c = txt.charCodeAt(max - 1);
+  return txt.slice(0, c >= 0xD800 && c <= 0xDBFF ? max - 1 : max);
+}
+export function ajustarParametro(tipo, v) {
+  const corta = (txt, max) => (txt.length > max ? { valor: recortarTexto(txt, max), recorte: { de: txt.length, a: max } } : { valor: txt, recorte: null });
+  if (tipo === 'texto') {
+    if (typeof v === 'number' && Number.isFinite(v)) return { ok: true, ...corta(String(v), MAX_TEXTO) };
+    if (typeof v === 'string') return { ok: true, ...corta(v, MAX_TEXTO) };
+    return { ok: false };
+  }
+  if (tipo === 'texto_largo') return typeof v === 'string' ? { ok: true, ...corta(v, MAX_TEXTO_LARGO) } : { ok: false };
+  if (tipo === 'si_no') return typeof v === 'boolean' ? { ok: true, valor: v, recorte: null } : { ok: false };
+  if (tipo === 'lista') {
+    if (!Array.isArray(v) || !v.every((x) => typeof x === 'string')) return { ok: false };
+    const limpios = v.filter((x) => x.trim() !== '');
+    let recorte = null;
+    const items = limpios.slice(0, MAX_LISTA).map((x) => {
+      if (x.length > MAX_TEXTO) { recorte = { de: x.length, a: MAX_TEXTO }; return recortarTexto(x, MAX_TEXTO); }
+      return x;
+    });
+    if (limpios.length > MAX_LISTA) recorte = { de: limpios.length, a: MAX_LISTA, renglones: true };
+    return { ok: true, valor: items, recorte };
+  }
+  // Parámetro desconocido: texto, número o sí/no.
+  if (typeof v === 'string') return { ok: true, ...corta(v, MAX_TEXTO_LARGO) };
+  if (typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v))) return { ok: true, valor: v, recorte: null };
+  return { ok: false };
+}
+const NOMBRE_TIPO = { texto: 'un texto', texto_largo: 'un texto', si_no: 'sí o no', lista: 'una lista de textos' };
+// Nombre legible de cada parámetro, para los avisos.
+export const NOMBRE_PARAMETRO = {
+  empresa: 'Empresa', campo: 'Campo', localidad: 'Localidad', renspa: 'RENSPA', cuit: 'CUIT',
+  mostrarCuitEnInforme: 'Mostrar CUIT en el informe', vacasDeclaradas: 'Vacas declaradas',
+  paricionDesde: 'Parición desde', paricionHasta: 'Parición hasta', porcentajeToros: '% de toros',
+  queEsEnfrente: 'Qué es "Enfrente"', potreros: 'Potreros', motivosAjuste: 'Motivos rápidos de ajuste',
+  servicio: 'Servicio', inseminacion: 'Inseminación', tacto: 'Tacto', destete: 'Destete', yerra: 'Yerra',
+  paseTerneros: 'Pase de terneros', paseToro: 'Pase a toro', entoreVaquillonas: 'Entore de vaquillonas',
+};
+const nombreParam = (k) => NOMBRE_PARAMETRO[k] || String(k).slice(0, 40);
+// Texto del aviso de un recorte: "El membrete tenía N caracteres; se guardaron los primeros 300".
+export function textoRecorte(k, r) {
+  return r.renglones
+    ? `"${nombreParam(k)}" tenía ${r.de} renglones; se guardaron los primeros ${r.a}`
+    : `"${nombreParam(k)}" tenía ${r.de} caracteres; se guardaron los primeros ${r.a}`;
+}
+// Errores de TIPO en los parámetros de un backup (vacío = válidos). Lo largo no es error: se recorta.
+export function erroresParametros(P) {
+  const errs = [];
+  for (const [k, v] of Object.entries(P)) {
+    if (v === null || v === undefined) continue;
+    const tipo = ESQUEMA_PARAMETROS[k];
+    if (!ajustarParametro(tipo, v).ok) errs.push(`Parámetro "${nombreParam(k)}": tiene que ser ${NOMBRE_TIPO[tipo] || 'un texto, un número o sí/no'}`);
+  }
+  return errs;
+}
+// Parámetros guardados o importados: lo de tipo incorrecto vuelve al valor por defecto (la app nunca queda inutilizable)
+// y lo demasiado largo se recorta al tope (nunca se pierde lo escrito). Ambos se informan.
+export function normalizarParametros(P, defectos) {
+  const out = { ...defectos }, arreglados = [], recortados = [];
+  for (const [k, v] of Object.entries(esObj(P) ? P : {})) {
+    if (v === null || v === undefined) continue;
+    const a = ajustarParametro(ESQUEMA_PARAMETROS[k], v);
+    if (!a.ok) { arreglados.push(k); continue; }
+    out[k] = a.valor;
+    if (a.recorte) recortados.push({ clave: k, ...a.recorte, texto: textoRecorte(k, a.recorte) });
+  }
+  return { parametros: out, arreglados, recortados };
+}
 const esObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const TANDA_VALIDAR = 2000;
 function* validarGen(b) {
@@ -492,16 +651,18 @@ function* validarGen(b) {
     if (!Array.isArray(b[k])) err(`Falta la lista de ${k}`);
     else if (b.cuentas && b.cuentas[k] !== undefined && b.cuentas[k] !== b[k].length) err(`El archivo dice ${b.cuentas[k]} ${k} pero trae ${b[k].length}: puede estar incompleto`);
   }
+  if (b.caravanas !== undefined && b.caravanas !== null && !Array.isArray(b.caravanas)) err('La lista de caravanas del archivo está dañada');
   if (b.parametros !== undefined && b.parametros !== null && !esObj(b.parametros)) err('Los parámetros del archivo están dañados');
+  else if (esObj(b.parametros)) for (const e of erroresParametros(b.parametros)) err(e);
   if (errores.length) return salida();
 
   // Identificador: texto no vacío y sin repetir dentro de su lista.
   const chequearId = (x, nombre, vistos) => {
     if (!esId(x.id)) { err(`${nombre}: falta el identificador o está dañado`); return false; }
-    if (vistos.has(x.id)) { err(`${nombre}: el identificador "${x.id}" está repetido`); return false; }
+    if (vistos.has(x.id)) { err(`${nombre}: el identificador ${x.id} está repetido`); return false; }
     vistos.add(x.id); return true;
   };
-  const anuladoOk = (a) => a === undefined || a === null || esObj(a);
+  const anuladoOk = (a) => a === undefined || a === null || (esObj(a) && esFechaHora(a.fecha) && typeof a.motivo === 'string');
 
   const rIds = new Set(), cIds = new Set();
   for (let i = 0; i < b.rodeos.length; i++) {
@@ -511,6 +672,7 @@ function* validarGen(b) {
     if (!esObj(r)) { err(`${n}: renglón vacío o dañado`); continue; }
     chequearId(r, n, rIds);
     if (typeof r.nombre !== 'string' || !r.nombre.trim()) err(`${n}: le falta el nombre`);
+    if (r.esperadas !== undefined && r.esperadas !== null && !(Array.isArray(r.esperadas) && r.esperadas.length <= 200 && r.esperadas.every(esId))) err(`${n}: la lista de categorías esperadas está dañada`);
   }
   for (let i = 0; i < b.categorias.length; i++) {
     if (i % TANDA_VALIDAR === TANDA_VALIDAR - 1) yield;
@@ -519,6 +681,10 @@ function* validarGen(b) {
     if (!esObj(c)) { err(`${n}: renglón vacío o dañado`); continue; }
     chequearId(c, n, cIds);
     if (typeof c.nombre !== 'string' || !c.nombre.trim()) err(`${n}: le falta el nombre`);
+    if (c.sexo !== undefined && c.sexo !== null && !['H', 'M', '?', ''].includes(c.sexo)) err(`${n}: el sexo tiene que ser H, M o ? (sin sexar)`);
+    if (c.bovino !== undefined && c.bovino !== null && typeof c.bovino !== 'boolean') err(`${n}: "bovino" tiene que ser sí o no`);
+    if (c.senasa !== undefined && c.senasa !== null && (typeof c.senasa !== 'string' || c.senasa.length > MAX_TEXTO)) err(`${n}: la equivalencia SENASA tiene que ser un texto`);
+    if (c.reemplazadaPor !== undefined && c.reemplazadaPor !== null && !esId(c.reemplazadaPor)) err(`${n}: la categoría que la reemplaza está dañada`);
   }
   const lugarOk = (l) => esObj(l) && rIds.has(l.rodeoId) && cIds.has(l.categoriaId);
 
@@ -534,6 +700,8 @@ function* validarGen(b) {
     if (!Number.isInteger(c.cantidad) || c.cantidad < 0) err(`${n}: la cantidad contada tiene que ser un número entero (0 o más)`);
     if (!lugarOk(c)) err(`${n}: usa un rodeo o una categoría que no está en el archivo`);
     if (!anuladoOk(c.anulado)) err(`${n}: la marca de anulado está dañada`);
+    if (c.metodo !== undefined && c.metodo !== null && c.metodo !== '' && !METODOS_CONTEO.includes(c.metodo)) err(`${n}: el método de conteo tiene que ser ${METODOS_CONTEO.join(', ')}`);
+    if (!listaCaravanasOk(c.lecturas)) err(`${n}: la lista de lecturas de caravanas está dañada`);
   }
 
   const idsM = new Set();
@@ -590,4 +758,131 @@ export async function validarBackupEnTandas(b, ceder) {
 export function huellaStock(movimientos) {
   const st = calcularStock(movimientos);
   return [...st.entries()].filter(([, v]) => v !== 0).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k}=${v}`).join(';');
+}
+
+// ---- Migración del modelo v0.3 (categorías del papel) al v0.4 (categorías SENASA) ----
+// ¿El estado usa todavía las categorías de la v0.3? (tiene alguna de las viejas y ninguna de las nuevas)
+export function esModeloViejo(estado, mapeo, nuevasIds) {
+  const ids = new Set(estado.categorias.map((c) => c.id));
+  return Object.keys(mapeo).some((id) => ids.has(id)) && !nuevasIds.some((id) => ids.has(id));
+}
+
+// Devuelve un estado nuevo (no toca el recibido). Nunca reescribe la historia:
+// - Sin movimientos ni conteos: arranca limpio con la plantilla nueva.
+// - Con datos: agrega las categorías nuevas, desactiva las viejas que tienen equivalente, y pasa el stock de cada
+//   casilla vieja a la nueva con un renglón de "cambio de categoría" (fecha: hoy o la del último movimiento, si es
+//   posterior), con motivo y lote. Las casillas en negativo no se pasan: se avisan.
+export function migrarModeloV03(estado, { mapeo, categoriasNuevas, rodeosNuevos, esperadasViejas, parametrosNuevos, hoy, ahoraIso, nuevoId: idf = nuevoId }) {
+  const avisos = [];
+  const clon = (x) => JSON.parse(JSON.stringify(x));
+  const params = { ...(estado.parametros || {}) };
+  for (const [k, v] of Object.entries(parametrosNuevos)) if ((params[k] === undefined || params[k] === '') && v !== '') params[k] = v;
+  if (!estado.movimientos.length && !estado.conteos.length) {
+    return { estado: { rodeos: clon(rodeosNuevos), categorias: clon(categoriasNuevas), movimientos: [], conteos: [], parametros: params }, nuevos: [], avisos, limpio: true };
+  }
+  const nuevasIds = new Set(categoriasNuevas.map((c) => c.id));
+  const viejas = estado.categorias.map((c) => {
+    const x = { ...c };
+    if (mapeo[c.id] && nuevasIds.has(mapeo[c.id])) { x.activa = false; x.cuentaComoVaca = false; x.orden = 100 + (c.orden || 0); x.reemplazadaPor = mapeo[c.id]; }
+    else x.orden = 50 + (c.orden || 0); // categoría propia del usuario: se conserva tal cual, después de las SENASA
+    return x;
+  });
+  const categorias = [...clon(categoriasNuevas), ...viejas];
+  const rodeos = estado.rodeos.map((r) => (r.esperadas ? { ...r } : { ...r, esperadas: esperadasViejas[r.id] ? [...esperadasViejas[r.id]] : [] }));
+  const rIds = new Set(rodeos.map((r) => r.id));
+  let fecha = hoy;
+  for (const m of estado.movimientos) if (!m.anulado && m.fecha > fecha) fecha = m.fecha;
+  const stock = calcularStock(estado.movimientos);
+  const lote = idf();
+  const nuevos = [];
+  const nomR = (id) => rodeos.find((r) => r.id === id)?.nombre || id;
+  const nomC = (id) => categorias.find((c) => c.id === id)?.nombre || id;
+  for (const [k, n] of [...stock.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const { rodeoId, categoriaId } = desarmarClave(k);
+    const dest = mapeo[categoriaId];
+    if (!dest || !nuevasIds.has(dest) || !rIds.has(rodeoId) || n === 0) continue;
+    if (n < 0) { avisos.push(`${nomR(rodeoId)} · ${nomC(categoriaId)} estaba en negativo (${n}): no se pasó a ${nomC(dest)}. Revisalo.`); continue; }
+    nuevos.push({
+      id: idf(), fecha, tipo: 'cambio_categoria', cantidad: n,
+      origen: { rodeoId, categoriaId }, destino: { rodeoId, categoriaId: dest },
+      nota: 'Cambio de modelo (v0.4): las categorías pasan a ser las de SENASA', caravana: '', motivo: 'Cambio de modelo v0.4',
+      lote, creado: ahoraIso, anulado: null, extra: { migracion: 'v0.4' },
+    });
+  }
+  return {
+    estado: { rodeos, categorias, movimientos: [...estado.movimientos, ...nuevos], conteos: estado.conteos, parametros: params },
+    nuevos, avisos, limpio: false, fecha,
+  };
+}
+
+// ---- Plantilla Excel de saldo inicial ----
+// filas: lo que devuelve read-excel-file para la hoja "Saldo inicial" (matriz de celdas).
+// Formato: una fila "Fecha" (A=Fecha, B=la fecha); una fila de encabezado (A="Rodeo", luego nombres de categorías);
+// la fila siguiente con los identificadores técnicos de las categorías (A="id"); las filas de rodeos con la cantidad
+// en cada categoría y el identificador del rodeo en la última columna. Devuelve { ok, errores, fecha, renglones, total }.
+export function leerPlantillaSaldo(filas, rodeos, categorias) {
+  const errores = [];
+  const err = (t) => errores.push(t);
+  const fin = () => {
+    const total = errores.length;
+    const lista = errores.slice(0, MAX_ERRORES);
+    if (total > MAX_ERRORES) lista.push(`y ${total - MAX_ERRORES} problema${total - MAX_ERRORES === 1 ? '' : 's'} más`);
+    return { ok: false, errores: lista, total };
+  };
+  if (!Array.isArray(filas)) return { ok: false, errores: ['No se encontró la hoja "Saldo inicial": no parece la plantilla de esta app.'], total: 1 };
+  const txt = (v) => (v === null || v === undefined ? '' : v instanceof Date ? v : String(v).trim());
+  const iFecha = filas.findIndex((f) => Array.isArray(f) && /^fecha/i.test(String(txt(f[0]))));
+  const iCab = filas.findIndex((f) => Array.isArray(f) && String(txt(f[0])).toLowerCase() === 'rodeo');
+  if (iCab < 0 || !Array.isArray(filas[iCab + 1])) return { ok: false, errores: ['No se encontró la fila de encabezado ("Rodeo"): no parece la plantilla de esta app o se movieron filas.'], total: 1 };
+  // Fecha
+  let fecha = null;
+  const fv = iFecha >= 0 ? filas[iFecha][1] : null;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (fv instanceof Date && !Number.isNaN(fv.getTime())) fecha = `${fv.getUTCFullYear()}-${pad(fv.getUTCMonth() + 1)}-${pad(fv.getUTCDate())}`;
+  else if (typeof fv === 'number' && Number.isFinite(fv) && fv > 20000 && fv < 80000) { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(fv) * 86400000); fecha = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  else if (typeof fv === 'string') {
+    const m = fv.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/) || null;
+    const m2 = fv.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) fecha = `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+    else if (m2) fecha = fv.trim();
+  }
+  if (!fecha || !esFecha(fecha)) err('Falta la fecha del saldo o no es válida: escribila como dd/mm/aaaa en la celda amarilla de "Fecha".');
+  const cab = filas[iCab], ids = filas[iCab + 1].map((v) => String(txt(v)));
+  if (ids[0] !== 'id') return { ok: false, errores: ['Falta la fila de identificadores debajo del encabezado: no se puede saber qué columna es cada categoría. Descargá la plantilla de nuevo.'], total: 1 };
+  const cIds = new Set(categorias.map((c) => c.id)), rPorId = new Map(rodeos.map((r) => [r.id, r]));
+  const columnas = [];
+  for (let j = 1; j < ids.length; j++) {
+    if (!ids[j]) continue;
+    if (ids[j] === 'rodeo_id') continue;
+    if (!cIds.has(ids[j])) { err(`La columna "${String(txt(cab[j]))}" es de una categoría que no existe en la app (${ids[j].slice(0, 40)}).`); continue; }
+    columnas.push(j);
+  }
+  const jRodeo = ids.indexOf('rodeo_id');
+  if (jRodeo < 0) return { ok: false, errores: ['Falta la columna técnica "rodeo_id": descargá la plantilla de nuevo.'], total: 1 };
+  const renglones = [];
+  const nomC = (id) => categorias.find((c) => c.id === id)?.nombre || id;
+  const vistos = new Set();
+  for (let i = iCab + 2; i < filas.length; i++) {
+    const f = filas[i];
+    if (!Array.isArray(f)) continue;
+    const rid = String(txt(f[jRodeo]));
+    const nombre = String(txt(f[0]));
+    const algo = columnas.some((j) => txt(f[j]) !== '');
+    if (!rid && !algo) continue; // fila vacía o de totales
+    const fila = `Fila ${i + 1}${nombre ? ` (${nombre.slice(0, 40)})` : ''}`;
+    if (!rPorId.has(rid)) { err(`${fila}: el rodeo no existe en la app. No agregues filas a mano: creá el rodeo en la app y descargá la plantilla de nuevo.`); continue; }
+    if (vistos.has(rid)) { err(`${fila}: el rodeo está repetido.`); continue; }
+    vistos.add(rid);
+    for (const j of columnas) {
+      const v = f[j];
+      if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) continue;
+      const n = typeof v === 'number' ? v : /^\s*\d+\s*$/.test(String(v)) ? Number(String(v).trim()) : NaN;
+      if (!Number.isInteger(n) || n < 0) { err(`${fila}, columna ${nomC(ids[j])}: «${String(v).slice(0, 20)}» no es un número entero (0 o más).`); continue; }
+      if (n > 1000000) { err(`${fila}, columna ${nomC(ids[j])}: ${n} es demasiado.`); continue; }
+      if (n > 0) renglones.push({ rodeoId: rid, categoriaId: ids[j], cantidad: n });
+    }
+  }
+  if (!errores.length && !renglones.length) err('La plantilla no tiene ninguna cantidad: completá las celdas amarillas.');
+  if (errores.length) return fin();
+  return { ok: true, errores: [], total: 0, fecha, renglones, cabezas: renglones.reduce((s, r) => s + r.cantidad, 0) };
 }

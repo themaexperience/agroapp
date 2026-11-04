@@ -8,8 +8,14 @@ const STORES = ['rodeos', 'categorias', 'movimientos', 'conteos', 'kv'];
 // Copia de lo que había justo antes de la última importación (un solo registro, clave fija).
 const RESPALDO = 'respaldo';
 const CLAVE_RESPALDO = 'antes_de_importar';
+// Datos chicos del respaldo (fecha y cantidades), para mostrarlo sin traer miles de renglones a memoria.
+const CLAVE_INFO = 'antes_de_importar_info';
 
 let dbp = null;
+// Avisos hacia la app: otra ventana vieja bloquea la actualización de la base, o una ventana nueva la necesita.
+const avisos = { bloqueada: null, versionNueva: null };
+export function alBloquear(fn) { avisos.bloqueada = fn; }
+export function alVersionNueva(fn) { avisos.versionNueva = fn; }
 
 function abrir() {
   if (dbp) return dbp;
@@ -22,10 +28,14 @@ function abrir() {
       }
       if (!db.objectStoreNames.contains(RESPALDO)) db.createObjectStore(RESPALDO, { keyPath: 'clave' });
     };
+    // Otra ventana abierta con una versión vieja no suelta la base: se avisa (en vez de quedar en blanco).
+    // La espera sigue: cuando la otra ventana se cierra, la apertura termina sola.
+    req.onblocked = () => { if (avisos.bloqueada) avisos.bloqueada(); };
     req.onsuccess = () => {
       const db = req.result;
-      // Si otra pestaña con una versión más nueva necesita actualizar la base, se cierra esta conexión.
-      db.onversionchange = () => { db.close(); dbp = null; };
+      // Si otra pestaña con una versión más nueva necesita actualizar la base, esta conexión se cierra
+      // y la app se recarga para quedar en la versión nueva.
+      db.onversionchange = () => { db.close(); dbp = null; if (avisos.versionNueva) avisos.versionNueva(); };
       resolve(db);
     };
     req.onerror = () => { dbp = null; reject(req.error); };
@@ -95,13 +105,13 @@ export async function guardar(cambios) {
 // se aborta todo: ni el respaldo ni el borrado ni lo nuevo quedan escritos.
 // opciones: { respaldar: true, borrarRespaldo: false, tanda: 400 }
 export async function reemplazarTodo(estado, kv, opciones = {}) {
-  const { respaldar = true, borrarRespaldo = false, tanda = 400 } = opciones;
+  const { respaldar = true, borrarRespaldo = false, tanda = 250 } = opciones;
   const db = await abrir();
   await transaccion(db, [...STORES, RESPALDO], (tx, fallar) => {
     const seguro = (fn) => (...a) => { try { fn(...a); } catch (e) { fallar(e); } };
     const escribir = seguro(() => {
       for (const s of STORES) tx.objectStore(s).clear();
-      if (borrarRespaldo) tx.objectStore(RESPALDO).delete(CLAVE_RESPALDO);
+      if (borrarRespaldo) { tx.objectStore(RESPALDO).delete(CLAVE_RESPALDO); tx.objectStore(RESPALDO).delete(CLAVE_INFO); }
       for (const [clave, valor] of Object.entries(kv || {})) tx.objectStore('kv').put({ clave, valor });
       const cola = [];
       for (const s of ['rodeos', 'categorias', 'movimientos', 'conteos']) for (const x of estado[s] || []) cola.push([s, x]);
@@ -124,7 +134,9 @@ export async function reemplazarTodo(estado, kv, opciones = {}) {
         if (--faltan) return;
         const kvAct = Object.fromEntries((actual.kv || []).map((x) => [x.clave, x.valor]));
         const datos = { rodeos: actual.rodeos, categorias: actual.categorias, movimientos: actual.movimientos, conteos: actual.conteos, kv: kvAct };
-        const p = tx.objectStore(RESPALDO).put({ clave: CLAVE_RESPALDO, fecha: new Date().toISOString(), datos });
+        const fecha = new Date().toISOString();
+        tx.objectStore(RESPALDO).put({ clave: CLAVE_INFO, fecha, movimientos: datos.movimientos.length, conteos: datos.conteos.length });
+        const p = tx.objectStore(RESPALDO).put({ clave: CLAVE_RESPALDO, fecha, datos });
         p.onsuccess = escribir;
       });
     }
@@ -137,6 +149,17 @@ export async function leerRespaldo() {
   return new Promise((resolve, reject) => {
     const tx = db.transaction([RESPALDO], 'readonly');
     const r = tx.objectStore(RESPALDO).get(CLAVE_RESPALDO);
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+// Fecha y cantidades del respaldo, sin traerlo entero. null si no hay info (respaldo de la v0.3.2 o ninguno).
+export async function infoRespaldo() {
+  const db = await abrir();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([RESPALDO], 'readonly');
+    const r = tx.objectStore(RESPALDO).get(CLAVE_INFO);
     r.onsuccess = () => resolve(r.result || null);
     r.onerror = () => reject(r.error);
   });

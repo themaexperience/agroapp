@@ -1,9 +1,9 @@
 // app.js — Interfaz. Toda la lógica de stock vive en ledger.js; acá solo se muestra y se carga.
 import * as L from './ledger.js';
 import * as DB from './db.js';
-import { RODEOS_INICIALES, CATEGORIAS_INICIALES, PARAMETROS_INICIALES, ATAJOS, DESTINO_PROBABLE } from './seeds.js';
+import { RODEOS_INICIALES, CATEGORIAS_INICIALES, PARAMETROS_INICIALES, ATAJOS, DESTINO_PROBABLE, NACEN, MAPEO_V03, ESPERADAS_V03 } from './seeds.js';
 
-const VERSION_APP = '0.3.2';
+const VERSION_APP = '0.4.0';
 
 // ---------- Estado ----------
 const S = {
@@ -38,7 +38,7 @@ function hoyLocal(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).pad
 const hoyIso = () => hoyLocal(new Date());
 const fFecha = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
 // Fecha local de un instante guardado en ISO (UTC): nunca cortar el texto ISO.
-const fFechaDe = (ts) => (ts ? fFecha(hoyLocal(new Date(ts))) : '');
+const fFechaDe = (ts) => { if (!ts) return ''; const d = new Date(ts); return Number.isNaN(d.getTime()) ? 'fecha desconocida' : fFecha(hoyLocal(d)); };
 function fFechaHora(d = new Date()) { return `${fFecha(hoyLocal(d))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const fMes = (ym) => `${MESES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
@@ -141,8 +141,10 @@ async function registrar(nuevos, { anular = [], conteos = [] } = {}) {
   const anuladosNuevos = anular.map((a) => ({ ...a.mov, anulado: { fecha: ahora, motivo: a.motivo } }));
   const porId = new Map(anuladosNuevos.map((m) => [m.id, m]));
   const despues = S.movimientos.map((m) => porId.get(m.id) || m).concat(nuevos);
-  const claves = L.clavesDe([...nuevos, ...anuladosNuevos]);
-  const negs = L.negativosPorCambio(S.movimientos, despues, claves);
+  // Con el índice: solo se recalculan las celdas que toca el cambio (no se recorre todo el libro).
+  const idx0 = IDX(), antesRef = S.movimientos;
+  const quitar = anular.map((a) => a.mov);
+  const negs = L.negativosPorCambioIdx(idx0, quitar, nuevos);
   if (negs.length) {
     const lista = negs.map((n) => `<li><b>${esc(nomR(n.rodeoId))} · ${esc(nomC(n.categoriaId))}</b>: quedaría en <span class="error">${num(n.saldo)}</span> el ${fFecha(n.fecha)}</li>`).join('');
     // La acción segura (Revisar) es la destacada.
@@ -157,6 +159,8 @@ async function registrar(nuevos, { anular = [], conteos = [] } = {}) {
     return false;
   }
   S.movimientos = despues;
+  // El índice se actualiza solo en las celdas tocadas (rearmarlo entero con 20.000 movimientos es lo que más tarda).
+  if (idxRef === antesRef) { idxVal = L.indiceConCambios(idx0, quitar, nuevos); idxRef = despues; }
   if (conteos.length) {
     const ids = new Set(conteos.map((c) => c.id));
     S.conteos = S.conteos.filter((c) => !ids.has(c.id)).concat(conteos);
@@ -262,12 +266,61 @@ const BOTONES_TIPO = [
 ];
 
 function atajo(id) { return ATAJOS.find((a) => a.id === id); }
-// Filas de un atajo que se pueden usar desde un rodeo de origen.
-function filasAtajo(a, rodeoO) {
-  return a.filas.map((f, i) => ({ ...f, key: 'f' + i }))
-    .filter((f) => cat(f.cat)?.activa && (!f.rodeo || rodeo(f.rodeo)?.activo) && !(f.cat === a.catO && (f.rodeo || rodeoO) === rodeoO));
+const rodeoUsable = (id) => !!rodeo(id)?.activo;
+// Rodeos destino que ofrece un atajo para las filas sin rodeo fijo ('mismo' = el de origen). Si ninguno de los
+// sugeridos existe, se ofrecen todos los rodeos activos (menos el de origen) y hay que elegir uno.
+function opcionesDestino(a, rodeoO) {
+  const ops = [];
+  for (const id of a.rodeosDestino || []) {
+    const r = id === 'mismo' ? rodeoO : id;
+    if (r && rodeoUsable(r) && !ops.includes(r)) ops.push(r);
+  }
+  return ops.length ? { ops, sugerido: ops[0] } : { ops: rodeosActivos().map((r) => r.id).filter((id) => id !== rodeoO), sugerido: null };
 }
-const atajosDisponibles = () => ATAJOS.filter((a) => cat(a.catO)?.activa && filasAtajo(a, null).length);
+// Filas de un atajo usables desde un rodeo de origen. Cada fila: de qué categoría sale (catO) y a cuál pasa (cat).
+// Si el rodeo fijo de la fila no existe o está desactivado, la fila va al rodeo elegido en los botones.
+// Se ocultan las filas con categorías desactivadas y los "traslados" al mismo rodeo de origen (no mueven nada).
+function filasAtajo(a, rodeoO, rodeoD = null) {
+  return a.filas.map((f, i) => {
+    const fijo = f.rodeo && rodeoUsable(f.rodeo) ? f.rodeo : null;
+    const texto = f.texto && fijo ? f.texto : f.catO === f.cat ? nomC(f.cat) : `${nomC(f.catO)} → ${nomC(f.cat)}`;
+    return { ...f, rodeo: fijo, texto, key: 'f' + i };
+  }).filter((f) => cat(f.cat)?.activa && cat(f.catO)?.activa
+    && !(rodeoO && f.catO === f.cat && (f.rodeo || rodeoD || null) === rodeoO)
+    && !(rodeoO && f.catO === f.cat && !f.rodeo && !rodeoD && opcionesDestino(a, rodeoO).ops.every((id) => id === rodeoO)));
+}
+const atajosDisponibles = () => ATAJOS.filter((a) => filasAtajo(a, null).length);
+// Destino de las filas sin rodeo fijo: lo elegido, o el sugerido del atajo.
+function destinoAtajo(a) {
+  if (C.rodeoD) return C.rodeoD;
+  return opcionesDestino(a, C.rodeoO).sugerido;
+}
+const CUANDO = { yerra: 'yerra', destete: 'destete', tacto: 'tacto', paricion: null, paseTerneros: 'paseTerneros', paseToro: 'paseToro' };
+function epocaAtajo(a) {
+  if (a.cuando === 'paricion') { const P = S.parametros; return P.paricionDesde || P.paricionHasta ? `${P.paricionDesde || '?'} al ${P.paricionHasta || '?'}` : ''; }
+  const k = CUANDO[a.cuando]; return k ? String(S.parametros[k] || '') : '';
+}
+
+// Categorías para mostrar en un rodeo: primero las esperadas, las que tienen animales y las ya escritas;
+// el resto queda plegado en "Otras categorías" (un toque más, nunca bloqueado).
+function catsDelRodeo(rodeoId, fecha, { solo = null, escritas = {} } = {}) {
+  const r = rodeo(rodeoId);
+  const esp = solo ? new Set(solo) : new Set(r?.esperadas?.length ? r.esperadas : catsActivas().map((c) => c.id));
+  const st = rodeoId ? stockEn(rodeoId, fecha) : {};
+  const principales = [], otras = [];
+  for (const c of catsActivas()) {
+    // Con "solo" (nacimiento): solo esas categorías a la vista, aunque en el rodeo haya otras con animales.
+    if (esp.has(c.id) || (!solo && (st[c.id] || 0) !== 0) || (escritas[c.id] ?? '') !== '') principales.push(c); else otras.push(c);
+  }
+  return { principales, otras, st };
+}
+const plegadas = (otras, html) => (otras.length ? `<details class="otras"><summary>Otras categorías (${otras.length})</summary>${html}</details>` : '');
+// Aviso suave: categorías cargadas que no son las esperadas del rodeo.
+function fueraDeLoEsperado(rodeoId, catIds) {
+  const r = rodeo(rodeoId);
+  if (!r?.esperadas?.length) return [];
+  return catIds.filter((id) => !r.esperadas.includes(id));
+}
 
 function stockEn(rodeoId, fecha) {
   const idx = IDX();
@@ -286,7 +339,7 @@ function vCargar() {
   if (nombreTipo) sel.push(`<b>${esc(nombreTipo)}</b>`);
   if (C.rodeoO) sel.push(esc(nomR(C.rodeoO)));
   if (C.rodeoD && C.tipo === 'traslado') sel.push('→ ' + esc(nomR(C.rodeoD)));
-  if (C.catO) sel.push('de ' + esc(nomC(C.catO)));
+  if (C.catO && !C.atajo) sel.push('de ' + esc(nomC(C.catO)));
   const resumen = sel.length ? `<div class="resumen-sel">${sel.join(' · ')}</div>` : '';
   let cuerpo = '';
   if (C.paso === 'tipo') {
@@ -301,7 +354,9 @@ function vCargar() {
     cuerpo = `<h1>¿A qué rodeo van?</h1>${gridRodeos('rodeoD', C.rodeoO)}`;
   } else if (C.paso === 'catO') {
     const st = stockEn(C.rodeoO, fechaSesion());
-    cuerpo = `<h1>¿Qué categoría cambia?</h1><div class="grilla">${catsActivas().map((c) => `<button class="btn" data-cato="${c.id}">${esc(c.nombre)}<small>hay ${num(st[c.id])}</small></button>`).join('')}</div>`;
+    const { principales, otras } = catsDelRodeo(C.rodeoO, fechaSesion());
+    const bot = (c) => `<button class="btn" data-cato="${c.id}">${esc(c.nombre)}<small>hay ${num(st[c.id])}</small></button>`;
+    cuerpo = `<h1>¿Qué categoría cambia?</h1><div class="grilla">${principales.map(bot).join('')}</div>${plegadas(otras, `<div class="grilla">${otras.map(bot).join('')}</div>`)}`;
   } else if (C.paso === 'cant') {
     cuerpo = pasoCantidades();
   }
@@ -314,9 +369,8 @@ function gridRodeos(campo, excluir) {
 }
 
 // Elección del rodeo destino en un cambio de categoría: botones a la vista (sin paso extra).
-function chipsDestino(opciones) {
-  const actual = C.rodeoD || C.rodeoO;
-  return `<div class="chips-titulo">¿Quedan en qué rodeo?</div><div class="chips">${opciones.map((id) =>
+function chipsDestino(opciones, actual) {
+  return `<div class="chips-titulo">¿${actual ? 'Quedan' : 'Van'} en qué rodeo?${actual ? '' : ' <b class="error">Elegí uno</b>'}</div><div class="chips">${opciones.map((id) =>
     `<button class="btn chip ${id === actual ? 'sel' : ''}" data-rodeo="${id}" data-campo="rodeoD" aria-pressed="${id === actual}">${id === C.rodeoO ? 'Mismo rodeo (' + esc(nomR(id)) + ')' : esc(nomR(id))}</button>`).join('')}</div>`;
 }
 
@@ -340,23 +394,26 @@ function pasoCantidades() {
   const st = stockEn(C.rodeoO, fechaSesion());
   let titulo = '¿Cuántos?', extra = '', filas = '', origenTxt = '';
   if (tipo === 'cambio_categoria') {
-    origenTxt = `<p>Salen de <b>${esc(nomC(C.catO))}</b> (hay ${num(st[C.catO])}).</p>`;
     if (C.atajo) {
       const a = atajo(C.atajo);
-      const fs = filasAtajo(a, C.rodeoO);
+      const dest = destinoAtajo(a);
+      const fs = filasAtajo(a, C.rodeoO, dest);
       const libres = fs.some((f) => !f.rodeo);
-      const opciones = [C.rodeoO, ...a.rodeosDestino.filter((id) => id !== C.rodeoO && rodeo(id)?.activo)];
-      titulo = '¿Cuántos pasan a cada una?';
-      extra = libres && opciones.length > 1 ? chipsDestino(opciones) : '';
-      const dest = C.rodeoD || C.rodeoO;
+      const { ops } = opcionesDestino(a, C.rodeoO);
+      const ep = epocaAtajo(a);
+      titulo = a.nombre;
+      origenTxt = `<p class="chico">${esc(a.ayuda)}${ep ? ` · Época: ${esc(ep)}` : ''}</p>`;
+      extra = libres && (ops.length > 1 || !dest) ? chipsDestino(ops, dest) : '';
       filas = fs.map((f) => {
         const r = f.rodeo || dest;
-        const stD = stockEn(r, fechaSesion());
-        return filaCant(f.key, f.texto || nomC(f.cat), `en ${esc(nomR(r))} hay ${num(stD[f.cat])}`);
-      }).join('');
+        const stD = r ? stockEn(r, fechaSesion()) : {};
+        const hay = `hay ${num(st[f.catO])} ${esc(nomC(f.catO))}${r ? ` · van a ${esc(nomR(r))}${r !== C.rodeoO ? ` (hay ${num(stD[f.cat])})` : ''}` : ''}`;
+        return filaCant(f.key, f.texto, hay);
+      }).join('') || '<p class="error">En este rodeo no hay nada para este atajo. Revisá las categorías y rodeos activos.</p>';
     } else {
+      origenTxt = `<p>Salen de <b>${esc(nomC(C.catO))}</b> (hay ${num(st[C.catO])}).</p>`;
       titulo = '¿A qué categoría pasan y cuántos?';
-      extra = chipsDestino(rodeosActivos().map((r) => r.id));
+      extra = chipsDestino(rodeosActivos().map((r) => r.id), C.rodeoD || C.rodeoO);
       const dest = C.rodeoD || C.rodeoO;
       const stD = stockEn(dest, fechaSesion());
       filas = catsActivas().filter((c) => c.id !== C.catO).map((c) => filaCant(c.id, c.nombre, `en ${esc(nomR(dest))} hay ${num(stD[c.id])}`)).join('');
@@ -369,7 +426,9 @@ function pasoCantidades() {
         <div class="fila-btns">${(S.parametros.motivosAjuste || []).map((m) => `<button class="btn ${C.motivo === m ? 'sel' : ''}" data-motivo="${esc(m)}">${esc(m)}</button>`).join('')}</div>
         <label class="campo"><span>Motivo (obligatorio)</span><input type="text" id="c-motivo" value="${esc(C.motivo)}" autocomplete="off"></label>`;
     }
-    filas = catsActivas().map((c) => {
+    const solo = tipo === 'nacimiento' ? NACEN : null;
+    const { principales, otras } = catsDelRodeo(C.rodeoO, fechaSesion(), { solo, escritas: C.cant });
+    const fila = (c) => {
       let ext = '';
       const d = rojas.get(c.id);
       // Solo se ofrece vincular si el signo del ajuste coincide con lo que falta explicar.
@@ -379,7 +438,8 @@ function pasoCantidades() {
         ext = `<button class="btn vinc ${on ? 'sel' : ''}" data-vinc="${c.id}" data-conteo="${d.conteo.id}" aria-pressed="${on}">${on ? '✔ ' : ''}Explica la diferencia del conteo del ${fFecha(d.conteo.fecha)} (${numS(d.pendiente)})</button>`;
       }
       return filaCant(c.id, c.nombre, `hay ${num(st[c.id])}`, ext);
-    }).join('');
+    };
+    filas = principales.map(fila).join('') + plegadas(otras, otras.map(fila).join(''));
   }
   const conCaravana = ['mortandad', 'venta'].includes(tipo);
   const caravana = conCaravana ? `<label class="campo"><span>Caravana N° (opcional)</span><input type="text" id="c-caravana" inputmode="numeric" value="${esc(C.caravana)}" autocomplete="off"></label>` : '';
@@ -405,7 +465,13 @@ function postCargar() {
   if (!inputs.length) return;
   if (inputs.some((i) => i.value !== '') && C.tipo !== 'ajuste') return;
   let foco = inputs[0];
-  if (C.tipo === 'nacimiento') foco = inputs.find((i) => i.dataset.cant === 'c-terneros') || foco;
+  if (C.tipo === 'nacimiento') foco = inputs.find((i) => i.dataset.cant === NACEN.find((id) => cat(id)?.activa)) || foco;
+  else if (C.atajo) {
+    const st = stockEn(C.rodeoO, fechaSesion());
+    const fs = filasAtajo(atajo(C.atajo), C.rodeoO, destinoAtajo(atajo(C.atajo)));
+    const k = fs.find((f) => st[f.catO] > 0)?.key;
+    foco = inputs.find((i) => i.dataset.cant === k) || foco;
+  }
   else if (['mortandad', 'venta', 'traslado'].includes(C.tipo)) {
     const st = stockEn(C.rodeoO, fechaSesion());
     foco = inputs.find((i) => st[i.dataset.cant] > 0) || foco;
@@ -447,26 +513,36 @@ async function guardarCarga() {
       case 'traslado': nuevos.push(nuevoMov({ ...base, tipo: 'traslado', cantidad: n, origen: { rodeoId: r, categoriaId: key }, destino: { rodeoId: C.rodeoD, categoriaId: key } })); break;
       case 'ajuste': nuevos.push(nuevoMov({ ...base, tipo: 'ajuste', cantidad: n, conteoId: C.vinc[key] || null, [C.signo === 1 ? 'destino' : 'origen']: { rodeoId: r, categoriaId: key } })); break;
       case 'cambio_categoria': {
-        let destCat = key, destRodeo = C.rodeoD || r;
-        if (C.atajo) { const f = filasAtajo(atajo(C.atajo), r).find((x) => x.key === key); destCat = f.cat; destRodeo = f.rodeo || C.rodeoD || r; }
-        const tipo = destCat === C.catO ? 'traslado' : 'cambio_categoria';
-        nuevos.push(nuevoMov({ ...base, tipo, cantidad: n, origen: { rodeoId: r, categoriaId: C.catO }, destino: { rodeoId: destRodeo, categoriaId: destCat } }));
+        let origCat = C.catO, destCat = key, destRodeo = C.rodeoD || r;
+        if (C.atajo) {
+          const a = atajo(C.atajo), dest = destinoAtajo(a);
+          const f = filasAtajo(a, r, dest).find((x) => x.key === key);
+          if (!f) continue;
+          destRodeo = f.rodeo || dest;
+          if (!destRodeo) { err.textContent = 'Elegí a qué rodeo van.'; return; }
+          origCat = f.catO; destCat = f.cat;
+        }
+        const tipo = destCat === origCat ? 'traslado' : 'cambio_categoria';
+        nuevos.push(nuevoMov({ ...base, tipo, cantidad: n, origen: { rodeoId: r, categoriaId: origCat }, destino: { rodeoId: destRodeo, categoriaId: destCat } }));
         break;
       }
     }
   }
+  if (!nuevos.length) { err.textContent = 'Escribí al menos una cantidad.'; return; }
   if (!(await registrar(nuevos))) return;
+  // Aviso suave: categorías que no son las habituales del rodeo (no bloquea: ya se guardó).
+  const fuera = [...new Set(nuevos.flatMap((m) => [m.destino && fueraDeLoEsperado(m.destino.rodeoId, [m.destino.categoriaId]).length ? `${nomC(m.destino.categoriaId)} en ${nomR(m.destino.rodeoId)}` : null]).filter(Boolean))];
   if (C.tipo === 'cambio_categoria' && !C.atajo && pares.length === 1) {
     S.meta.ultimoDestino = { ...(S.meta.ultimoDestino || {}), [C.catO]: pares[0][0] };
     guardarMeta();
   }
   const d = describir(nuevos[0]);
-  toast(`Guardado: ${d.tipo} · ${nuevos.length > 1 ? nuevos.length + ' renglones' : d.lugar}`);
+  toast(`Guardado: ${d.tipo} · ${nuevos.length > 1 ? nuevos.length + ' renglones' : d.lugar}${fuera.length ? ` · Ojo: ${fuera.join(', ')} no es lo habitual` : ''}`);
   C = nuevaCarga(); render();
 }
 
 function etiquetaCant(key) {
-  if (C.atajo) { const f = filasAtajo(atajo(C.atajo), C.rodeoO).find((x) => x.key === key); return f ? (f.texto || nomC(f.cat)) : key; }
+  if (C.atajo) { const f = filasAtajo(atajo(C.atajo), C.rodeoO, destinoAtajo(atajo(C.atajo))).find((x) => x.key === key); return f ? f.texto : key; }
   return nomC(key);
 }
 
@@ -501,7 +577,7 @@ function tarjetasRodeo(mapa, t) {
 
 function vStock() {
   const f = stockFecha || hoyIso();
-  const mapa = L.calcularStock(S.movimientos, f);
+  const mapa = IDX().stockMapa(f);
   const t = L.totales(mapa);
   if (!S.movimientos.length) {
     return `<h1>Stock</h1><div class="tarjeta"><p><b>Todavía no hay movimientos cargados.</b></p>
@@ -650,7 +726,11 @@ function vConteoNuevo() {
     <div class="fecha-sesion"><label for="f-conteo">Fecha del conteo:</label><input type="date" id="f-conteo" value="${f}">${ant}</div>
     <div class="resumen-sel"><b>Conteo</b> · ${esc(nomR(CT.rodeo))}</div>
     <h1>¿Cuántos se contaron?</h1><p class="chico">Dejá vacío lo que no se contó. Escribí 0 si se contó y no había ninguno.</p>
-    ${catsActivas().map((c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-ccant="${c.id}" aria-label="${esc(c.nombre)}" autocomplete="off" value="${esc(vals[c.id] || '')}"></div>`).join('')}
+    ${(() => {
+      const { principales, otras } = catsDelRodeo(CT.rodeo, f, { escritas: vals });
+      const fila = (c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-ccant="${c.id}" aria-label="${esc(c.nombre)}" autocomplete="off" value="${esc(vals[c.id] || '')}"></div>`;
+      return principales.map(fila).join('') + plegadas(otras, otras.map(fila).join(''));
+    })()}
     <details${CT.origenTxt || CT.notaTxt ? ' open' : ''}><summary>Quién o cómo se contó (opcional)</summary>
       <label class="campo"><span>Origen del conteo (ej.: tranquera, conteo 2, acta de vacunación)</span><input type="text" id="ct-origen" autocomplete="off" value="${esc(CT.origenTxt || '')}"></label>
       <label class="campo"><span>Nota (opcional)</span><textarea id="ct-nota" rows="2" autocomplete="off">${esc(CT.notaTxt || '')}</textarea></label></details>
@@ -786,14 +866,16 @@ function vMenu() {
 }
 
 // ----- Informe -----
-const cssStr = (s) => '"' + String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ') + '"';
+// Texto de usuario dentro de una cadena CSS: todo lo que no sea letra, número o puntuación segura se escribe
+// como escape hexadecimal (\3C para "<", \22 para comillas…). Así un nombre nunca puede cerrar el <style>.
+const cssStr = (s) => '"' + String(s ?? '').replace(/[^\p{L}\p{N} .,·:()\/-]/gu, (c) => '\\' + c.codePointAt(0).toString(16) + ' ') + '"';
 
 // pantalla=true: vista previa en el teléfono. La planilla va en su propio recuadro deslizable y las
 // diferencias como lista (en una tabla de 6 columnas no entran a 360 px). Impreso y descargado: tablas.
 function htmlInforme({ limiteDifs = Infinity, pantalla = false } = {}) {
   const f = informeFecha || hoyIso();
   const P = S.parametros;
-  const mapa = L.calcularStock(S.movimientos, f);
+  const mapa = IDX().stockMapa(f);
   const { html: tabla, cs, t } = tablaStock(mapa, { conUbic: true, sinCeros: true, soloConAnimales: true });
   const sinAnimales = S.categorias.filter((c) => c.activa && !cs.includes(c)).map((c) => c.nombre);
   const est = L.diferenciasConteo(S.conteos, S.movimientos, IDX());
@@ -832,8 +914,8 @@ async function cssTexto() {
 async function descargarInforme() {
   const css = await cssTexto();
   const f = informeFecha || hoyIso();
-  const html = `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stock al ${fFecha(f)}</title><style>${css}
-body{padding:16px;background:#fff}</style></head><body class="solo-informe"><div id="impresion" style="display:block">${htmlInforme()}</div><p style="font-family:Arial"><button onclick="window.print()" style="min-height:52px;font-size:18px">Imprimir</button></p><style>@media print{button{display:none}}</style></body></html>`;
+  const html = `<!doctype html><html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'sha256-IcLpzmlTwKLTG1cpXxCHxGyx20mhnG5N6xlSbMZT3Gg='; base-uri 'none'; form-action 'none'"><title>Stock al ${esc(fFecha(f))}</title><style>${css}
+body{padding:16px;background:#fff}</style></head><body class="solo-informe"><div id="impresion" style="display:block">${htmlInforme()}</div><p style="font-family:Arial"><button id="imprimir" type="button" style="min-height:52px;font-size:18px">Imprimir</button><script>document.getElementById('imprimir').addEventListener('click',function(){window.print()});</script></p><style>@media print{button{display:none}}</style></body></html>`;
   descargar(new Blob([html], { type: 'text/html' }), `stock-${f}.html`);
 }
 
@@ -909,6 +991,8 @@ function vRodeosCats() {
     ${rs.map((r, i) => `<div class="cfg-fila">
       <label class="campo"><span>Nombre</span><input type="text" data-cfg="rodeo" data-id="${r.id}" data-campo="nombre" value="${esc(r.nombre)}"></label>
       <label class="campo"><span>Dónde está (texto libre, ej.: Enfrente, potrero)</span><input type="text" data-cfg="rodeo" data-id="${r.id}" data-campo="ubicacion" value="${esc(r.ubicacion)}"></label>
+      <div class="chips-titulo">Categorías que suelen estar (ordena las casillas; no bloquea nada):</div>
+      <div class="chips">${catsActivas().map((c) => { const on = (r.esperadas || []).includes(c.id); return `<button class="btn chip ${on ? 'sel' : ''}" data-esp="${r.id}" data-cat="${c.id}" aria-pressed="${on}">${on ? '✔ ' : ''}${esc(c.nombre)}</button>`; }).join('')}</div>
       <div class="fila-btns"><label class="check"><input type="checkbox" data-cfg="rodeo" data-id="${r.id}" data-campo="activo" ${r.activo ? 'checked' : ''}> Activo</label>
       <button class="btn" data-orden="rodeo" data-id="${r.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button class="btn" data-orden="rodeo" data-id="${r.id}" data-dir="1" ${i === rs.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button></div></div>`).join('')}
     <button class="btn grande" data-acc="agregar-rodeo">Agregar rodeo</button>
@@ -916,6 +1000,7 @@ function vRodeosCats() {
     ${cs.map((c, i) => `<div class="cfg-fila">
       <label class="campo"><span>Nombre</span><input type="text" data-cfg="cat" data-id="${c.id}" data-campo="nombre" value="${esc(c.nombre)}"></label>
       <label class="campo"><span>Equivale a (SENASA), opcional</span><input type="text" data-cfg="cat" data-id="${c.id}" data-campo="senasa" value="${esc(c.senasa || '')}"></label>
+      <div class="chico">Sexo: ${c.sexo === 'H' ? 'hembra' : c.sexo === 'M' ? 'macho' : c.sexo === '?' ? 'sin sexar' : 'no aplica'}${c.bovino === false ? ' · no es bovino (no suma en SENASA)' : ''}${c.reemplazadaPor ? ` · categoría de la versión anterior, reemplazada por ${esc(nomC(c.reemplazadaPor))}` : ''}</div>
       <div class="fila-btns"><label class="check"><input type="checkbox" data-cfg="cat" data-id="${c.id}" data-campo="activa" ${c.activa ? 'checked' : ''}> Activa</label>
       <label class="check"><input type="checkbox" data-cfg="cat" data-id="${c.id}" data-campo="cuentaComoVaca" ${c.cuentaComoVaca ? 'checked' : ''}> Cuenta como vaca</label>
       <button class="btn" data-orden="cat" data-id="${c.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button class="btn" data-orden="cat" data-id="${c.id}" data-dir="1" ${i === cs.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button></div></div>`).join('')}
@@ -933,6 +1018,15 @@ async function cambiarCfg(el) {
   toast('Guardado');
 }
 
+async function cambiarEsperada(rodeoId, catId) {
+  const r = rodeo(rodeoId); if (!r) return;
+  const esp = new Set(r.esperadas || []);
+  if (esp.has(catId)) esp.delete(catId); else esp.add(catId);
+  r.esperadas = S.categorias.filter((c) => esp.has(c.id)).map((c) => c.id);
+  await DB.guardar({ rodeos: [r] });
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+
 async function mover(tipo, id, dir) {
   const lista = (tipo === 'rodeo' ? S.rodeos : S.categorias).sort((a, b) => a.orden - b.orden);
   const i = lista.findIndex((o) => o.id === id), j = i + dir;
@@ -948,10 +1042,10 @@ async function agregar(tipo) {
     (m) => m.querySelector('#n-nombre').focus());
   if (!r) return;
   if (tipo === 'rodeo') {
-    const x = { id: 'r-' + L.nuevoId(), nombre: r, ubicacion: '', orden: Math.max(0, ...S.rodeos.map((o) => o.orden)) + 1, activo: true };
+    const x = { id: 'r-' + L.nuevoId(), nombre: r, ubicacion: '', orden: Math.max(0, ...S.rodeos.map((o) => o.orden)) + 1, activo: true, esperadas: [] };
     await DB.guardar({ rodeos: [x] }); S.rodeos.push(x);
   } else {
-    const x = { id: 'c-' + L.nuevoId(), nombre: r, orden: Math.max(0, ...S.categorias.map((o) => o.orden)) + 1, activa: true, cuentaComoVaca: false, senasa: '' };
+    const x = { id: 'c-' + L.nuevoId(), nombre: r, orden: Math.max(0, ...S.categorias.map((o) => o.orden)) + 1, activa: true, cuentaComoVaca: false, senasa: '', sexo: '', bovino: true };
     await DB.guardar({ categorias: [x] }); S.categorias.push(x);
   }
   render();
@@ -960,27 +1054,45 @@ async function agregar(tipo) {
 // ----- Parámetros -----
 const PARAMS_UI = [
   ['empresa', 'Empresa (membrete)'], ['campo', 'Campo (membrete)'], ['localidad', 'Localidad (membrete)'], ['renspa', 'RENSPA'], ['cuit', 'CUIT'],
-  ['vacasDeclaradas', 'Cantidad de vacas declarada (a confirmar). Solo de referencia; el stock se calcula.'],
-  ['paricionDesde', 'Parición desde (a confirmar)'], ['paricionHasta', 'Parición hasta (a confirmar)'],
-  ['porcentajeToros', '% de toros (a confirmar)'], ['queEsEnfrente', 'Qué es "Enfrente"'],
+  ['vacasDeclaradas', 'Cantidad de vacas declarada. Solo de referencia; el stock se calcula.'],
+  ['porcentajeToros', '% de toros'], ['queEsEnfrente', 'Qué es "Enfrente"'],
+];
+// Calendario de cría (valores estándar para parición jul–sep, editables). No genera tareas: da contexto en los atajos.
+const CALENDARIO_UI = [
+  ['paricionDesde', 'Parición desde (dd/mm)'], ['paricionHasta', 'Parición hasta (dd/mm)'], ['servicio', 'Servicio'], ['inseminacion', 'Inseminación'],
+  ['tacto', 'Tacto'], ['destete', 'Destete'], ['yerra', 'Yerra (marcación, castración, sexado)'], ['paseTerneros', 'Pase de terneros (ternera → vaquillona, ternero → torito)'],
+  ['paseToro', 'Pase de torito a toro'], ['entoreVaquillonas', 'Entore de vaquillonas (15 o 27 meses: sin elegir)'],
 ];
 function vParametros() {
   const P = S.parametros;
   return `<h1>Datos a confirmar y membrete</h1><p class="chico">Ninguno de estos datos está fijo en la app. Se guardan al salir de cada casilla.</p>
-    ${PARAMS_UI.map(([k, t]) => `<label class="campo"><span>${esc(t)}</span><input type="text" data-param="${k}" value="${esc(P[k] ?? '')}"></label>`).join('')}
+    ${PARAMS_UI.map(([k, t]) => { const val = String(P[k] ?? ''); return `<label class="campo"><span>${esc(t)}</span><input type="text" data-param="${k}" maxlength="${L.MAX_TEXTO}" value="${esc(val)}">${contadorHtml(k, val.length, L.MAX_TEXTO)}</label>`; }).join('')}
     <label class="check"><input type="checkbox" data-param="mostrarCuitEnInforme" ${P.mostrarCuitEnInforme ? 'checked' : ''}> Mostrar CUIT en el informe</label>
+    <h2>Calendario de cría</h2><p class="chico">Valores estándar para una parición de julio a septiembre. Cambialos por los de tu campo.</p>
+    ${CALENDARIO_UI.map(([k, t]) => { const val = String(P[k] ?? ''); return `<label class="campo"><span>${esc(t)}</span><input type="text" data-param="${k}" maxlength="${L.MAX_TEXTO}" value="${esc(val)}">${contadorHtml(k, val.length, L.MAX_TEXTO)}</label>`; }).join('')}
     <p class="chico">Qué cuenta como "vaca": se marca en Rodeos y categorías.</p>
-    <label class="campo"><span>Potreros (uno por renglón, texto libre)</span><textarea data-param="potreros">${esc(P.potreros || '')}</textarea></label>
-    <label class="campo"><span>Motivos rápidos de ajuste (uno por renglón)</span><textarea data-param="motivosAjuste">${esc((P.motivosAjuste || []).join('\n'))}</textarea></label>`;
+    <label class="campo"><span>Potreros (uno por renglón, texto libre)</span><textarea data-param="potreros" maxlength="${L.MAX_TEXTO_LARGO}">${esc(P.potreros || '')}</textarea>${contadorHtml('potreros', (P.potreros || '').length, L.MAX_TEXTO_LARGO)}</label>
+    <label class="campo"><span>Motivos rápidos de ajuste (uno por renglón; hasta ${L.MAX_LISTA} renglones de ${L.MAX_TEXTO} caracteres)</span><textarea data-param="motivosAjuste">${esc((P.motivosAjuste || []).join('\n'))}</textarea></label>`;
+}
+// Contador "caracteres usados / tope" debajo de cada casilla de Datos (el tope lo impone maxlength).
+function contadorHtml(k, n, max) {
+  return `<span class="contador" data-cont="${esc(k)}">${num(n)} de ${num(max)} caracteres</span>`;
 }
 async function cambiarParam(el) {
   const k = el.dataset.param;
   let v = el.type === 'checkbox' ? el.checked : el.value;
-  if (k === 'motivosAjuste') v = v.split('\n').map((s) => s.trim()).filter(Boolean);
-  else if (typeof v === 'string') v = v.trim();
+  let recorte = null;
+  if (k === 'motivosAjuste' || typeof v === 'string') {
+    // Mismo ajuste que al importar: lo largo se recorta (sin partir emojis) y se avisa; nunca se vacía.
+    const crudo = k === 'motivosAjuste' ? v.split('\n').map((x) => x.trim()) : v.trim();
+    const a = L.ajustarParametro(L.ESQUEMA_PARAMETROS[k] || 'texto', crudo);
+    if (!a.ok) { toast('No se pudo guardar ese dato'); return; }
+    v = a.valor; recorte = a.recorte;
+  }
   S.parametros[k] = v;
   await DB.guardar({ kv: { parametros: S.parametros } });
-  toast('Guardado');
+  if (recorte) { toast('Guardado recortado'); await avisarRecortes([{ clave: k, ...recorte, texto: L.textoRecorte(k, recorte) }], 'Se guardó recortado'); render(); }
+  else toast('Guardado');
 }
 
 // ----- Saldo inicial (transcribir la planilla de partida) -----
@@ -994,13 +1106,90 @@ function vSaldo() {
       <p>Solo puede haber uno. Si estaba mal, anulalo en Movimientos (se anula entero) y volvé a cargarlo acá.</p>
       <button class="btn prim" data-ir="mas" data-sub="movimientos">Ir a Movimientos</button></div>`;
   }
-  const cs = catsActivas();
   return `<h1>Saldo inicial</h1>
-    <p>Transcribí la planilla de partida: lo que había en cada rodeo ese día. Dejá vacío lo que no hay.</p>
-    <div class="fecha-sesion"><label for="f-saldo">Fecha de la planilla:</label><input type="date" id="f-saldo" value="${fechaSesion()}"></div>
-    ${rodeosActivos().map((r) => `<div class="tarjeta"><b>${esc(r.nombre)}</b>${cs.map((c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-saldo="${r.id}|${c.id}" aria-label="${esc(r.nombre + ' ' + c.nombre)}" autocomplete="off"></div>`).join('')}</div>`).join('')}
+    <p>Es el punto de partida del libro: lo que hay hoy en cada rodeo, según tu stock ya revisado. Se carga una sola vez.</p>
+    <div class="tarjeta"><b>Con la compu (recomendado si son muchos rodeos)</b>
+      <p class="chico">Bajá la planilla Excel con tus rodeos y categorías, completá las celdas amarillas y volvé a subirla. Antes de guardar vas a ver el total.</p>
+      <div class="fila-btns"><button class="btn" data-acc="plantilla-saldo">Descargar plantilla Excel</button>
+      <label class="btn prim" for="imp-plantilla">Importar plantilla completa</label></div>
+      <input type="file" id="imp-plantilla" accept=".xlsx" hidden></div>
+    <h2>O escribilo acá</h2>
+    <div class="fecha-sesion"><label for="f-saldo">Fecha del saldo:</label><input type="date" id="f-saldo" value="${fechaSesion()}"></div>
+    <div class="total-vivo">Total: <b id="s-total">0</b> cabezas</div>
+    ${rodeosActivos().map((r) => {
+      const { principales, otras } = catsDelRodeo(r.id, fechaSesion());
+      const fila = (c) => `<div class="cant-fila"><div class="nom">${esc(c.nombre)}</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" data-saldo="${r.id}|${c.id}" aria-label="${esc(r.nombre + ' ' + c.nombre)}" autocomplete="off"></div>`;
+      return `<div class="tarjeta"><div class="fila-total"><b>${esc(r.nombre)}</b><span>Total: <b data-stot="${r.id}">0</b></span></div>${principales.map(fila).join('')}${plegadas(otras, otras.map(fila).join(''))}</div>`;
+    }).join('')}
     <div class="error" id="s-error"></div>
     <button class="btn prim grande" data-acc="cargar-saldo" style="margin-top:12px">Guardar saldo inicial</button>`;
+}
+// Totales en vivo mientras se escribe el saldo (por rodeo y general), para comparar con el papel.
+function totalesSaldo() {
+  const porR = {}; let tot = 0;
+  for (const i of document.querySelectorAll('[data-saldo]')) {
+    const v = i.value.trim(); if (!/^\d+$/.test(v)) continue;
+    const r = i.dataset.saldo.split('|')[0]; porR[r] = (porR[r] || 0) + Number(v); tot += Number(v);
+  }
+  document.querySelectorAll('[data-stot]').forEach((el) => { el.textContent = num(porR[el.dataset.stot] || 0); });
+  const t = $('#s-total'); if (t) t.textContent = num(tot);
+}
+
+// Plantilla Excel del saldo inicial: rodeos activos en filas, categorías activas en columnas, celdas amarillas.
+// Las columnas e identificadores técnicos (fila "id" y columna "rodeo_id") permiten leerla sin depender de los nombres.
+async function descargarPlantillaSaldo() {
+  if (typeof writeXlsxFile === 'undefined') { toast('No se pudo cargar el módulo de Excel'); return; }
+  const cs = catsActivas(), rs = rodeosActivos();
+  const AMA = '#FFF3A3', VER = '#D8F3DC';
+  const t = (v, o = {}) => ({ value: String(v), type: String, ...o });
+  const vacio = () => ({ value: null });
+  const ancho = 2 + cs.length;
+  const relleno = (fila) => { while (fila.length < ancho) fila.push(vacio()); return fila; };
+  const datos = [
+    relleno([t('Saldo inicial — completá las celdas amarillas', { fontWeight: 'bold' })]),
+    relleno([t('Fecha'), t(fFecha(fechaSesion()), { backgroundColor: AMA }), t('← escribila como dd/mm/aaaa')]),
+    relleno([t('Cantidad de cabezas en cada rodeo y categoría. Dejá vacío lo que no hay. No agregues ni borres filas o columnas: si te falta un rodeo, crealo en la app y bajá la plantilla de nuevo.', { wrap: true })]),
+    relleno([]),
+    [t('Rodeo', { fontWeight: 'bold', backgroundColor: VER }), ...cs.map((c) => t(c.nombre, { fontWeight: 'bold', backgroundColor: VER, wrap: true })), t('rodeo_id (no tocar)', { color: '#777777' })],
+    [t('id', { color: '#777777' }), ...cs.map((c) => t(c.id, { color: '#777777' })), t('rodeo_id', { color: '#777777' })],
+    ...rs.map((r) => [t(r.nombre, { fontWeight: 'bold' }), ...cs.map(() => ({ value: null, backgroundColor: AMA })), t(r.id, { color: '#777777' })]),
+  ];
+  const columns = [{ width: 26 }, ...cs.map(() => ({ width: 12 })), { width: 18 }];
+  const blob = await writeXlsxFile(datos, { columns, sheet: 'Saldo inicial' }).toBlob();
+  descargar(blob, `plantilla-saldo-inicial-${sello()}.xlsx`);
+  toast('Plantilla descargada');
+}
+
+async function importarPlantillaSaldo(file) {
+  if (saldoActivo().length) { await aviso('Ya hay un saldo inicial', '<p>Solo puede haber uno. Si estaba mal, anulalo en Movimientos (se anula entero) y volvé a importar.</p>'); return; }
+  if (typeof readXlsxFile === 'undefined') { toast('No se pudo cargar el módulo de Excel'); return; }
+  let filas;
+  await procesando('Leyendo la plantilla…');
+  try {
+    let hojas = null;
+    try { hojas = await readXlsxFile(file); } catch { hojas = null; }
+    // Esta versión de la librería devuelve todas las hojas: [{ sheet, data }].
+    if (Array.isArray(hojas)) { const h = hojas.find((x) => x && x.sheet === 'Saldo inicial'); filas = h ? h.data : null; }
+  } finally { finProcesando(); }
+  if (!filas) { await aviso('No se pudo leer la plantilla', `<p class="error">No se pudo abrir el Excel: el archivo está dañado, no es un Excel (.xlsx) o le falta la hoja "Saldo inicial".</p><p>No se guardó nada.</p>`); return; }
+  let r;
+  try { r = L.leerPlantillaSaldo(filas, S.rodeos, S.categorias); } catch { r = { ok: false, errores: ['La plantilla tiene un formato inesperado. Descargala de nuevo desde la app.'], total: 1 }; }
+  if (!r.ok) {
+    await aviso('La plantilla tiene problemas', `<p>Encontré ${num(r.total || r.errores.length)} problema${(r.total || r.errores.length) === 1 ? '' : 's'}${(r.total || 0) > L.MAX_ERRORES ? `; estos son los primeros ${L.MAX_ERRORES}` : ''}:</p><ul>${r.errores.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><p>No se guardó nada.</p>`);
+    return;
+  }
+  const porR = new Map();
+  for (const x of r.renglones) porR.set(x.rodeoId, (porR.get(x.rodeoId) || 0) + x.cantidad);
+  const inactivos = [...porR.keys()].filter((id) => !rodeo(id)?.activo).map(nomR);
+  const ok = await confirmar('Saldo inicial de la plantilla', `<p>Fecha: <b>${fFecha(r.fecha)}</b> · ${num(r.renglones.length)} casillas con animales.</p>
+    <table class="tabla-mini"><tbody>${[...porR.entries()].map(([id, n]) => `<tr><td>${esc(nomR(id))}</td><td class="n">${num(n)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b>${num(r.cabezas)}</b></td></tr></tbody></table>
+    ${inactivos.length ? `<p class="error">Ojo: ${inactivos.map(esc).join(', ')} está desactivado.</p>` : ''}
+    <p>¿Coincide con tu stock? Si no, cancelá, corregí la planilla y volvé a importarla.</p>`, 'Guardar saldo inicial');
+  if (!ok) return;
+  const lote = L.nuevoId();
+  const nuevos = r.renglones.map((x) => nuevoMov({ tipo: 'saldo_inicial', fecha: r.fecha, cantidad: x.cantidad, destino: { rodeoId: x.rodeoId, categoriaId: x.categoriaId }, nota: 'Saldo inicial (plantilla Excel)', lote }));
+  if (await registrar(nuevos)) { toast(`Saldo inicial cargado: ${num(r.cabezas)} cabezas`); ir('stock'); }
 }
 async function cargarSaldo() {
   const err = $('#s-error');
@@ -1101,16 +1290,16 @@ async function filasPorTandas(lista, fn, tanda = 2000) {
 
 // Excel: primero las columnas para leer (nombres), después las técnicas (ids) que sirven para reimportar exacto.
 const COL_MOV_LEER = ['Fecha', 'Tipo', 'Rodeo origen', 'Categoría origen', 'Rodeo destino', 'Categoría destino', 'Cantidad', 'Caravana', 'Nota', 'Motivo', 'Anulado el', 'Motivo de anulación'];
-const COL_MOV = ['id', 'fecha', 'tipo', 'cantidad', 'origen_rodeo_id', 'origen_categoria_id', 'destino_rodeo_id', 'destino_categoria_id', 'nota', 'caravana', 'motivo', 'conteo_id', 'lote', 'creado', 'anulado_fecha', 'anulado_motivo', 'corrige_a', 'antes_json', 'extra_json'];
+const COL_MOV = ['id', 'fecha', 'tipo', 'cantidad', 'origen_rodeo_id', 'origen_categoria_id', 'destino_rodeo_id', 'destino_categoria_id', 'nota', 'caravana', 'motivo', 'conteo_id', 'lote', 'creado', 'anulado_fecha', 'anulado_motivo', 'corrige_a', 'antes_json', 'extra_json', 'caravanas_json'];
 const COL_CON_LEER = ['Fecha', 'Rodeo', 'Categoría', 'Contado', 'Origen del conteo', 'Anulado el'];
-const COL_CON = ['id', 'fecha', 'rodeo_id', 'categoria_id', 'cantidad', 'origen', 'nota', 'creado', 'anulado_fecha', 'anulado_motivo', 'diferencia_original', 'calculado_al_contar'];
-const COL_ROD = ['id', 'nombre', 'ubicacion', 'orden', 'activo'];
-const COL_CAT = ['id', 'nombre', 'orden', 'activa', 'cuenta_como_vaca', 'senasa'];
+const COL_CON = ['id', 'fecha', 'rodeo_id', 'categoria_id', 'cantidad', 'origen', 'nota', 'creado', 'anulado_fecha', 'anulado_motivo', 'diferencia_original', 'calculado_al_contar', 'metodo', 'lecturas_json'];
+const COL_ROD = ['id', 'nombre', 'ubicacion', 'orden', 'activo', 'esperadas_json'];
+const COL_CAT = ['id', 'nombre', 'orden', 'activa', 'cuenta_como_vaca', 'senasa', 'sexo', 'bovino', 'reemplazada_por'];
 
 function filaMov(m) {
   const leer = [fFecha(m.fecha), describir(m).tipo, m.origen ? nomR(m.origen.rodeoId) : '', m.origen ? nomC(m.origen.categoriaId) : '', m.destino ? nomR(m.destino.rodeoId) : '', m.destino ? nomC(m.destino.categoriaId) : '',
     m.tipo === 'ajuste' ? L.signoAjuste(m) : m.cantidad, m.caravana ?? '', m.nota ?? '', m.motivo ?? '', m.anulado ? fFechaDe(m.anulado.fecha) : '', m.anulado?.motivo ?? ''];
-  const tec = [m.id, m.fecha, m.tipo, m.cantidad, m.origen?.rodeoId ?? '', m.origen?.categoriaId ?? '', m.destino?.rodeoId ?? '', m.destino?.categoriaId ?? '', m.nota ?? '', m.caravana ?? '', m.motivo ?? '', m.conteoId ?? '', m.lote ?? '', m.creado ?? '', m.anulado?.fecha ?? '', m.anulado?.motivo ?? '', m.corrigeA ?? '', m.antes ? JSON.stringify(m.antes) : '', JSON.stringify(m.extra || {})];
+  const tec = [m.id, m.fecha, m.tipo, m.cantidad, m.origen?.rodeoId ?? '', m.origen?.categoriaId ?? '', m.destino?.rodeoId ?? '', m.destino?.categoriaId ?? '', m.nota ?? '', m.caravana ?? '', m.motivo ?? '', m.conteoId ?? '', m.lote ?? '', m.creado ?? '', m.anulado?.fecha ?? '', m.anulado?.motivo ?? '', m.corrigeA ?? '', m.antes ? JSON.stringify(m.antes) : '', JSON.stringify(m.extra || {}), m.caravanas ? JSON.stringify(m.caravanas) : ''];
   return [...leer, ...tec];
 }
 // Excel en un Web Worker (excel-worker.js): comprimir o descomprimir miles de renglones no congela la pantalla.
@@ -1163,7 +1352,7 @@ async function exportarExcel() {
 async function armarExcel() {
   const b = L.armarBackup(estadoDatos(), new Date().toISOString());
   const hoy = hoyIso();
-  const mapa = L.calcularStock(S.movimientos, hoy);
+  const mapa = IDX().stockMapa(hoy);
   const t = L.totales(mapa);
   const cs = [...S.categorias].sort((a, b2) => a.orden - b2.orden), rs = [...S.rodeos].sort((a, b2) => a.orden - b2.orden);
   const stockFilas = [[`Stock al ${fFecha(hoy)}`, ...cs.map(() => ''), ''],
@@ -1174,9 +1363,9 @@ async function armarExcel() {
     hoja('Stock actual', ['Rodeo', ...cs.map((c) => c.nombre), 'Total'], stockFilas),
     hoja('Movimientos', [...COL_MOV_LEER, ...COL_MOV], await filasPorTandas(S.movimientos, filaMov)),
     hoja('Conteos', [...COL_CON_LEER, ...COL_CON], S.conteos.map((c) => [fFecha(c.fecha), nomR(c.rodeoId), nomC(c.categoriaId), c.cantidad, c.origen ?? '', c.anulado ? fFechaDe(c.anulado.fecha) : '',
-      c.id, c.fecha, c.rodeoId, c.categoriaId, c.cantidad, c.origen ?? '', c.nota ?? '', c.creado ?? '', c.anulado?.fecha ?? '', c.anulado?.motivo ?? '', c.diferenciaOriginal ?? '', c.calculadoAlContar ?? ''])),
-    hoja('Rodeos', COL_ROD, S.rodeos.map((r) => [r.id, r.nombre, r.ubicacion ?? '', r.orden, !!r.activo])),
-    hoja('Categorias', COL_CAT, S.categorias.map((c) => [c.id, c.nombre, c.orden, !!c.activa, !!c.cuentaComoVaca, c.senasa ?? ''])),
+      c.id, c.fecha, c.rodeoId, c.categoriaId, c.cantidad, c.origen ?? '', c.nota ?? '', c.creado ?? '', c.anulado?.fecha ?? '', c.anulado?.motivo ?? '', c.diferenciaOriginal ?? '', c.calculadoAlContar ?? '', c.metodo ?? '', c.lecturas ? JSON.stringify(c.lecturas) : ''])),
+    hoja('Rodeos', COL_ROD, S.rodeos.map((r) => [r.id, r.nombre, r.ubicacion ?? '', r.orden, !!r.activo, r.esperadas ? JSON.stringify(r.esperadas) : ''])),
+    hoja('Categorias', COL_CAT, S.categorias.map((c) => [c.id, c.nombre, c.orden, !!c.activa, !!c.cuentaComoVaca, c.senasa ?? '', c.sexo ?? '', c.bovino !== false, c.reemplazadaPor ?? ''])),
     hoja('Parametros', ['clave', 'valor_json'], Object.entries(S.parametros).map(([k, v]) => [k, JSON.stringify(v)])),
   ];
   await ceder();
@@ -1224,29 +1413,50 @@ async function importar(file) {
       await ceder();
       v.estado.conteos = L.migrarConteos(v.estado.conteos, v.estado.movimientos).conteos;
       await ceder();
+      // Backup de la v0.3: se pasa a las categorías SENASA antes de mostrarlo (renglones nuevos, historia intacta).
+      if (L.esModeloViejo(v.estado, MAPEO_V03, CATEGORIAS_INICIALES.map((c) => c.id))) {
+        const mg = migrarModelo(v.estado);
+        v.estado = { ...v.estado, ...mg.estado };
+        v.migracion = mg;
+        await ceder();
+      }
       tot = L.totales(L.calcularStock(v.estado.movimientos)).total;
     }
   } finally { finProcesando(); }
   if (!v.ok) {
     await aviso('El archivo tiene problemas', `<p>Encontré ${num(v.total || v.errores.length)} problema${(v.total || v.errores.length) === 1 ? '' : 's'}${(v.total || 0) > L.MAX_ERRORES ? `; estos son los primeros ${L.MAX_ERRORES}` : ''}:</p><ul>${v.errores.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><p>No se importó nada; tus datos siguen como estaban.</p>`); return;
   }
-  const ok = await confirmar('Importar backup', `<p>El archivo es del ${b.exportado ? fFechaDe(b.exportado) : '?'} y trae ${num(v.estado.movimientos.length)} movimientos y ${num(v.estado.conteos.length)} conteos. Stock total: <b>${num(tot)}</b>.</p>
-    <p class="error">Esto reemplaza lo que hay en este teléfono (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(L.calcularStock(S.movimientos)).total)}).</p>`, 'Reemplazar todo');
+  // Textos de Datos más largos que el tope: se avisa ANTES de confirmar, así se decide sabiendo qué se recorta.
+  const npImp = L.normalizarParametros(v.estado.parametros, PARAMETROS_INICIALES);
+  const avisoRec = npImp.recortados.length
+    ? `<p><b>Ojo:</b> algunos datos son más largos de lo permitido y se van a guardar recortados (no se pierden enteros):</p><ul>${npImp.recortados.map((r) => `<li>${esc(r.texto)}.</li>`).join('')}</ul>`
+    : '';
+  const avisoMig = v.migracion ? `<div class="tarjeta"><b>Backup de una versión anterior</b>${v.migracion.limpio ? '<p>No trae movimientos: se usan los rodeos y categorías estándar nuevos.</p>' : textoMigracion(v.migracion)}</div>` : '';
+  const ok = await confirmar('Importar backup', `${avisoMig}${avisoRec}<p>El archivo es del ${b.exportado ? fFechaDe(b.exportado) : '?'} y trae ${num(v.estado.movimientos.length)} movimientos y ${num(v.estado.conteos.length)} conteos. Stock total: <b>${num(tot)}</b>.</p>
+    <p class="error">Esto reemplaza lo que hay en este teléfono (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(IDX().stockMapa()).total)}).</p>`, 'Reemplazar todo');
   if (!ok) return;
   // Recién importado, lo que hay en el teléfono es igual al archivo: ese archivo ya es el backup al día.
   // El aviso de 7 días cuenta desde hoy, no desde la fecha en que se exportó el archivo (p. ej., el de arranque).
   const meta = { ...S.meta, ultimoBackup: new Date().toISOString() };
   await procesando('Importando…');
-  const parametros = { ...PARAMETROS_INICIALES, ...v.estado.parametros };
+  const parametros = npImp.parametros;
   try {
     await DB.reemplazarTodo(v.estado, { parametros, meta }, { respaldar: true });
   } catch (e) {
     await falloReemplazo(e, 'No se pudo importar', 'No se importó nada');
     return;
   }
-  try { await cargarEstado({ ...v.estado, parametros, meta }); } finally { finProcesando(); }
+  try {
+    await cargarEstado({ ...v.estado, parametros, meta });
+    // Rearmar el índice en su propia tarea y recién después dibujar: dos tareas cortas en vez de una larga.
+    await ceder(); IDX(); await ceder();
+  } finally { finProcesando(); }
   await actualizarRespaldo();
-  toast('Backup importado'); ir('stock');
+  toast(npImp.recortados.length ? 'Backup importado (con datos recortados: ver Más → Datos)' : 'Backup importado'); ir('stock');
+}
+// Textos de Datos más largos que el tope: se guardaron recortados (nunca vacíos). Se dice cuál y cuánto.
+function avisarRecortes(recortados, titulo) {
+  return aviso(titulo, `<ul>${recortados.map((r) => `<li>${esc(r.texto)}.</li>`).join('')}</ul><p>Revisalos en <b>Más → Datos a confirmar y membrete</b>. El stock no cambió.</p>`);
 }
 
 // Un reemplazo total que falló. Solo se dice "tus datos siguen como estaban" si la base confirmó que
@@ -1267,7 +1477,9 @@ async function falloReemplazo(e, titulo, nadaTxt) {
 async function actualizarRespaldo() {
   try {
     if (!(await DB.hayRespaldo())) { S.respaldo = null; return; }
-    const r = await DB.leerRespaldo();
+    const info = await DB.infoRespaldo();
+    if (info) { S.respaldo = { fecha: info.fecha, movimientos: info.movimientos || 0 }; return; }
+    const r = await DB.leerRespaldo(); // respaldo hecho por la v0.3.2 (sin info aparte)
     S.respaldo = r ? { fecha: r.fecha, movimientos: r.datos?.movimientos?.length || 0 } : null;
   } catch { S.respaldo = null; }
 }
@@ -1279,7 +1491,7 @@ async function deshacerImportacion() {
   const d = r.datos;
   const tot = L.totales(L.calcularStock(d.movimientos || [])).total;
   const ok = await confirmar('Deshacer última importación', `<p>Vuelve a lo que había en este teléfono antes de importar${r.fecha ? ` (el ${fFechaDe(r.fecha)})` : ''}: ${num((d.movimientos || []).length)} movimientos y ${num((d.conteos || []).length)} conteos. Stock total: <b>${num(tot)}</b>.</p>
-    <p class="error">Lo que hay ahora (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(L.calcularStock(S.movimientos)).total)}) se reemplaza. Si lo querés conservar, exportalo antes.</p>`, 'Deshacer importación');
+    <p class="error">Lo que hay ahora (${num(S.movimientos.length)} movimientos, stock ${num(L.totales(IDX().stockMapa()).total)}) se reemplaza. Si lo querés conservar, exportalo antes.</p>`, 'Deshacer importación');
   if (!ok) return;
   await procesando('Volviendo a los datos anteriores…');
   try {
@@ -1304,7 +1516,7 @@ document.addEventListener('click', async (e) => {
     if (ds.tipo === 'ajuste+' || ds.tipo === 'ajuste-') { C.tipo = 'ajuste'; C.signo = ds.tipo === 'ajuste+' ? 1 : -1; } else C.tipo = ds.tipo;
     C.paso = 'rodeo'; render(); return;
   }
-  if (ds.atajo) { const a = atajo(ds.atajo); C = nuevaCarga(); C.tipo = 'cambio_categoria'; C.atajo = a.id; C.catO = a.catO; C.paso = 'rodeo'; render(); return; }
+  if (ds.atajo) { const a = atajo(ds.atajo); C = nuevaCarga(); C.tipo = 'cambio_categoria'; C.atajo = a.id; C.paso = 'rodeo'; render(); return; }
   if (ds.rodeo) {
     if (ds.campo === 'conteo') { CT.rodeo = ds.rodeo; CT.vals = {}; CT.fecha = $('#f-conteo')?.value || CT.fecha; render(); return; }
     if (ds.campo === 'rodeoO') {
@@ -1315,7 +1527,7 @@ document.addEventListener('click', async (e) => {
     // rodeo destino (traslado: paso propio; cambio de categoría: botones dentro del paso de cantidades)
     leerCantVisibles();
     const enfocado = document.activeElement?.dataset?.cant;
-    C.rodeoD = ds.rodeo === C.rodeoO && C.tipo === 'cambio_categoria' ? null : ds.rodeo;
+    C.rodeoD = ds.rodeo === C.rodeoO && C.tipo === 'cambio_categoria' && !C.atajo ? null : ds.rodeo;
     if (C.paso === 'destino') C.paso = 'cant';
     render();
     if (enfocado) document.querySelector(`[data-cant="${enfocado}"]`)?.focus({ preventScroll: true });
@@ -1337,6 +1549,7 @@ document.addEventListener('click', async (e) => {
   if (ds.anular) { anularMov(ds.anular); return; }
   if (ds.corregir) { corregirMov(ds.corregir); return; }
   if (ds.orden) { mover(ds.orden, ds.id, Number(ds.dir)); return; }
+  if (ds.esp) { cambiarEsperada(ds.esp, ds.cat); return; }
   switch (ds.acc) {
     case 'atras': atras(); break;
     case 'guardar': unaVez(guardarCarga); break;
@@ -1356,6 +1569,7 @@ document.addEventListener('click', async (e) => {
     case 'agregar-rodeo': agregar('rodeo'); break;
     case 'agregar-cat': agregar('cat'); break;
     case 'cargar-saldo': unaVez(cargarSaldo); break;
+    case 'plantilla-saldo': unaVez(descargarPlantillaSaldo); break;
     case 'exp-json': unaVez(exportarJson); break;
     case 'deshacer-imp': unaVez(deshacerImportacion); break;
     case 'exp-xlsx': unaVez(exportarExcel); break;
@@ -1395,6 +1609,16 @@ document.addEventListener('change', async (e) => {
   if (el.dataset.cfg) { cambiarCfg(el); return; }
   if (el.dataset.param) { cambiarParam(el); return; }
   if (el.id === 'imp-archivo' && el.files[0]) { const f = el.files[0]; el.value = ''; importar(f); }
+  if (el.id === 'imp-plantilla' && el.files[0]) { const f = el.files[0]; el.value = ''; unaVez(() => importarPlantillaSaldo(f)); }
+});
+
+// Contador de caracteres en Datos, al tipear.
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.dataset && el.dataset.saldo) { totalesSaldo(); return; }
+  if (!el.dataset || !el.dataset.param || el.type === 'checkbox') return;
+  const c = document.querySelector(`[data-cont="${CSS.escape(el.dataset.param)}"]`);
+  if (c) c.textContent = `${num(el.value.length)} de ${num(Number(el.maxLength) > 0 ? el.maxLength : L.MAX_TEXTO)} caracteres`;
 });
 
 // Enter en una casilla de cantidad = guardar (ahorra un toque con teclado numérico que tiene "Ir").
@@ -1418,12 +1642,46 @@ async function cargarEstado(datos = null) {
   S.rodeos = d.rodeos.length ? d.rodeos : structuredClone(RODEOS_INICIALES);
   S.categorias = d.categorias.length ? d.categorias : structuredClone(CATEGORIAS_INICIALES);
   S.movimientos = d.movimientos; S.conteos = d.conteos;
-  S.parametros = { ...PARAMETROS_INICIALES, ...(d.parametros || {}) };
+  const np = L.normalizarParametros(d.parametros || {}, PARAMETROS_INICIALES);
+  S.parametros = np.parametros;
+  if (np.recortados.length) {
+    // Un texto guardado más largo que el tope (p. ej. de una versión sin tope): se recorta, no se vacía.
+    await DB.guardar({ kv: { parametros: S.parametros } });
+    S.avisoRecortes = np.recortados;
+  }
+  if (np.arreglados.length) {
+    // Un dato guardado con un tipo que no corresponde (archivo viejo o dañado): vuelve al valor por defecto y se avisa.
+    await DB.guardar({ kv: { parametros: S.parametros } });
+    S.avisoParametros = np.arreglados;
+  }
   S.meta = d.meta || {};
+  // Datos de la v0.3 (categorías copiadas del papel): se pasan a las categorías SENASA sin reescribir la historia.
+  if (L.esModeloViejo(S, MAPEO_V03, CATEGORIAS_INICIALES.map((c) => c.id))) {
+    const mg = migrarModelo({ rodeos: S.rodeos, categorias: S.categorias, movimientos: S.movimientos, conteos: S.conteos, parametros: S.parametros });
+    if (mg.limpio) await DB.reemplazarTodo(mg.estado, { parametros: mg.estado.parametros, meta: S.meta }, { respaldar: false });
+    else await DB.guardar({ rodeos: mg.estado.rodeos, categorias: mg.estado.categorias, movimientos: mg.nuevos, kv: { parametros: mg.estado.parametros } });
+    S.rodeos = mg.estado.rodeos; S.categorias = mg.estado.categorias; S.movimientos = mg.estado.movimientos; S.parametros = mg.estado.parametros;
+    if (!mg.limpio) S.avisoMigracion = mg;
+  }
   // Conteos de backups viejos (v0.1): se reconstruye la diferencia del momento de contar (D1).
   const mig = L.migrarConteos(S.conteos, S.movimientos);
   if (mig.cambiados.length) { S.conteos = mig.conteos; await DB.guardar({ conteos: mig.cambiados }); }
   if (revisarFechaSesion()) await guardarMeta();
+}
+
+// Migración v0.3 → v0.4 con los datos de esta app (catálogo nuevo, mapeo y esperadas de seeds.js).
+function migrarModelo(estado) {
+  const cal = ['paricionDesde', 'paricionHasta', 'servicio', 'inseminacion', 'tacto', 'destete', 'yerra', 'paseTerneros', 'paseToro', 'porcentajeToros'];
+  return L.migrarModeloV03(estado, {
+    mapeo: MAPEO_V03, categoriasNuevas: CATEGORIAS_INICIALES, rodeosNuevos: RODEOS_INICIALES, esperadasViejas: ESPERADAS_V03,
+    parametrosNuevos: Object.fromEntries(cal.map((k) => [k, PARAMETROS_INICIALES[k]])), hoy: hoyIso(), ahoraIso: new Date().toISOString(),
+  });
+}
+function textoMigracion(mg) {
+  const cab = mg.nuevos.reduce((s2, m) => s2 + m.cantidad, 0);
+  return `<p>Las categorías ahora son las de SENASA (vaca, vaquillona, ternero, ternera, torito, toro). CUT, Vacías y Mamones son rodeos.</p>
+    <p>Se agregaron <b>${num(mg.nuevos.length)} renglones de cambio de categoría</b> (${num(cab)} cabezas) con fecha ${fFecha(mg.fecha)} y motivo "Cambio de modelo v0.4". La historia anterior no se tocó: las categorías viejas quedaron desactivadas. El total de cabezas no cambia.</p>
+    ${mg.avisos.length ? `<p class="error">Para revisar:</p><ul>${mg.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}`;
 }
 
 // Al volver a la app (estaba en segundo plano, o abierta desde ayer): revisar la fecha de carga.
@@ -1441,6 +1699,14 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('pageshow', alVolver);
 window.addEventListener('focus', alVolver);
 
+DB.alBloquear(() => {
+  $('#vista').innerHTML = `<h1>Cerrá la otra ventana de la app</h1><p>Hay otra ventana o pestaña de esta app abierta con una versión anterior, y la base de datos se está actualizando.</p><p>Cerrala (o cerrá la pestaña de Chrome con la app) y esta pantalla sigue sola. No se pierde nada.</p>`;
+});
+DB.alVersionNueva(() => {
+  try { toast('La app se actualizó en otra ventana. Recargando…'); } catch { /* sin pantalla */ }
+  setTimeout(() => location.reload(), 800);
+});
+
 async function iniciar() {
   try {
     await cargarEstado();
@@ -1449,6 +1715,18 @@ async function iniciar() {
     return;
   }
   render();
+  if (S.avisoMigracion) {
+    const mg = S.avisoMigracion; S.avisoMigracion = null;
+    await aviso('La app pasó a las categorías SENASA', textoMigracion(mg));
+  }
+  if (S.avisoParametros) {
+    const ks = S.avisoParametros; S.avisoParametros = null;
+    await aviso('Se arreglaron datos guardados', `<p>Algunos datos de <b>Más → Datos a confirmar y membrete</b> estaban guardados con un formato que no corresponde y volvieron a su valor por defecto: ${ks.map((k) => `<b>${esc(L.NOMBRE_PARAMETRO[k] || k)}</b>`).join(', ')}.</p><p>Revisalos y volvé a escribirlos si hace falta. El stock no cambió.</p>`);
+  }
+  if (S.avisoRecortes) {
+    const rs = S.avisoRecortes; S.avisoRecortes = null;
+    await avisarRecortes(rs, 'Se recortaron datos guardados');
+  }
   S.persistido = await DB.pedirPersistencia();
   await actualizarRespaldo();
   if (S.vista === 'mas' && S.sub === 'backup') render();
