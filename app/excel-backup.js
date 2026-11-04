@@ -21,16 +21,29 @@
       anulado: o.anulado_fecha ? { fecha: s(o.anulado_fecha), motivo: s(o.anulado_motivo) } : null, corrigeA: s(o.corrige_a) || null,
       antes: o.antes_json ? JSON.parse(s(o.antes_json)) : null,
       extra: o.extra_json ? JSON.parse(s(o.extra_json)) : {},
+      ...(o.caravanas_json ? { caravanas: JSON.parse(s(o.caravanas_json)) } : {}),
     }));
     const conteos = objs('Conteos').map((o) => {
       const c = { id: s(o.id), fecha: s(o.fecha), rodeoId: s(o.rodeo_id), categoriaId: s(o.categoria_id), cantidad: n(o.cantidad), origen: s(o.origen), nota: s(o.nota), creado: s(o.creado), anulado: o.anulado_fecha ? { fecha: s(o.anulado_fecha), motivo: s(o.anulado_motivo) } : null };
       if (s(o.diferencia_original) !== '') c.diferenciaOriginal = n(o.diferencia_original);
       if (s(o.calculado_al_contar) !== '') c.calculadoAlContar = n(o.calculado_al_contar);
+      if (s(o.metodo) !== '') c.metodo = s(o.metodo);
+      if (s(o.lecturas_json) !== '') c.lecturas = JSON.parse(s(o.lecturas_json));
       return c;
     });
     const bool = (v) => v === true || v === 'true' || v === 1 || v === 'TRUE';
-    const rodeos = objs('Rodeos').map((o) => ({ id: s(o.id), nombre: s(o.nombre), ubicacion: s(o.ubicacion), orden: Number(o.orden), activo: bool(o.activo) }));
-    const categorias = objs('Categorias').map((o) => ({ id: s(o.id), nombre: s(o.nombre), orden: Number(o.orden), activa: bool(o.activa), cuentaComoVaca: bool(o.cuenta_como_vaca), senasa: s(o.senasa) }));
+    const rodeos = objs('Rodeos').map((o) => {
+      const r = { id: s(o.id), nombre: s(o.nombre), ubicacion: s(o.ubicacion), orden: Number(o.orden), activo: bool(o.activo) };
+      if (s(o.esperadas_json) !== '') r.esperadas = JSON.parse(s(o.esperadas_json));
+      return r;
+    });
+    const categorias = objs('Categorias').map((o) => {
+      const c = { id: s(o.id), nombre: s(o.nombre), orden: Number(o.orden), activa: bool(o.activa), cuentaComoVaca: bool(o.cuenta_como_vaca), senasa: s(o.senasa) };
+      if (o.sexo !== undefined) c.sexo = s(o.sexo);
+      if (o.bovino !== undefined && s(o.bovino) !== '') c.bovino = bool(o.bovino);
+      if (s(o.reemplazada_por) !== '') c.reemplazadaPor = s(o.reemplazada_por);
+      return c;
+    });
     const parametros = Object.fromEntries(objs('Parametros').map((o) => [s(o.clave), JSON.parse(s(o.valor_json))]));
     return { app: s(ctrl.app), formato: Number(ctrl.formato), exportado: s(ctrl.exportado),
       cuentas: { movimientos: Number(ctrl.movimientos), conteos: Number(ctrl.conteos), rodeos: Number(ctrl.rodeos), categorias: Number(ctrl.categorias) },

@@ -309,3 +309,225 @@ test('se informan los primeros 5 problemas y cuántos más hay', () => {
   assert.equal(v.errores.length, L.MAX_ERRORES + 1);
   assert.match(v.errores.at(-1), new RegExp(`y ${v.total - L.MAX_ERRORES} problemas más`));
 });
+
+// ---- Vuelta 6: parámetros con esquema, ids seguros, fechas de anulación, índice incremental ----
+test('parámetros con tipo incorrecto: el backup se rechaza con mensaje claro', () => {
+  for (const [k, v, txt] of [['motivosAjuste', 'Error de carga', /Motivos rápidos de ajuste.*lista/], ['motivosAjuste', 3, /lista/], ['motivosAjuste', ['ok', { x: 1 }], /lista/],
+    ['empresa', { a: 1 }, /Empresa.*texto/], ['mostrarCuitEnInforme', 'sí', /Mostrar CUIT.*sí o no/], ['campo', ['x'], /Campo.*tiene que ser un texto/], ['raro', [1], /raro/]]) {
+    const b = backupBueno(); b.parametros = { [k]: v };
+    assert.match(errDe(b), txt, `${k}=${JSON.stringify(v).slice(0, 30)}`);
+  }
+  const b = backupBueno(); b.parametros = { empresa: 'Mi SA', motivosAjuste: ['a', 'b'], mostrarCuitEnInforme: true, porcentajeToros: 3.5, futuro: 'texto' };
+  assert.equal(L.validarBackup(b).ok, true);
+});
+
+test('parámetros guardados dañados vuelven al valor por defecto y se informa cuáles', () => {
+  const def = { campo: 'Mi campo', motivosAjuste: ['A'], mostrarCuitEnInforme: false };
+  const r = L.normalizarParametros({ campo: 'San X', motivosAjuste: 'roto', mostrarCuitEnInforme: 'si', porcentajeToros: 4 }, def);
+  assert.deepEqual(r.arreglados.sort(), ['mostrarCuitEnInforme', 'motivosAjuste']);
+  assert.equal(r.parametros.campo, 'San X');
+  assert.deepEqual(r.parametros.motivosAjuste, ['A']);
+  assert.equal(r.parametros.mostrarCuitEnInforme, false);
+  assert.equal(r.parametros.porcentajeToros, '4');
+  assert.deepEqual(L.normalizarParametros(null, def).parametros, def);
+});
+
+test('ids con caracteres que podrían romper el HTML se rechazan', () => {
+  for (const id of ['a"b', "x' onmouseover='y", '<img>', 'r|c', 'a b', 'x'.repeat(101)]) {
+    let b = backupBueno(); b.movimientos[0].id = id; assert.match(errDe(b), /Movimiento 1: falta el identificador o está dañado/, id);
+    b = backupBueno(); b.rodeos[0].id = id; assert.match(errDe(b), /Rodeo 1: falta el identificador/, id);
+  }
+  const b = backupBueno(); b.movimientos[0].id = 'r-1a2b_c.d:e'; assert.equal(L.validarBackup(b).ok, true);
+});
+
+test('anulado con fecha inválida o sin motivo se rechaza', () => {
+  let b = backupBueno(); b.movimientos[0].anulado = { fecha: 'ayer', motivo: 'x' }; assert.match(errDe(b), /Movimiento 1: la marca de anulado/);
+  b = backupBueno(); b.movimientos[0].anulado = { fecha: '2026-11-02T10:00:00.000Z' }; assert.match(errDe(b), /Movimiento 1: la marca de anulado/);
+  b = backupBueno(); b.conteos[0].anulado = { fecha: 12, motivo: 'x' }; assert.match(errDe(b), /Conteo 1: la marca de anulado/);
+  b = backupBueno(); b.movimientos[0].anulado = { fecha: '2026-11-02T10:00:00.000Z', motivo: 'error' }; assert.equal(L.validarBackup(b).ok, true);
+});
+
+test('índice incremental = índice rearmado, y negativos con índice = negativos recorriendo todo', () => {
+  let seed = 7; const rnd = (k) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % k; };
+  const R = ['A', 'B', 'C'], C = ['vacas', 'terneros', 'toros'];
+  const f = () => `2026-${String(1 + rnd(12)).padStart(2, '0')}-${String(1 + rnd(28)).padStart(2, '0')}`;
+  const nuevo = () => {
+    const t = rnd(4); const a = lado(R[rnd(3)], C[rnd(3)]), b = lado(R[rnd(3)], C[rnd(3)]);
+    return t === 0 ? mov('nacimiento', f(), 1 + rnd(9), null, a) : t === 1 ? mov('mortandad', f(), 1 + rnd(9), a, null) : mov('traslado', f(), 1 + rnd(9), a, b);
+  };
+  let movs = Array.from({ length: 300 }, nuevo);
+  let idx = L.construirIndice(movs);
+  for (let paso = 0; paso < 200; paso++) {
+    const agregar = Array.from({ length: 1 + rnd(3) }, nuevo);
+    const vivos = movs.filter((m) => !m.anulado);
+    const quitar = rnd(3) === 0 && vivos.length ? [vivos[rnd(vivos.length)]] : [];
+    const anulados = quitar.map((m) => ({ ...m, anulado: { fecha: '2026-12-01T00:00:00Z', motivo: 'x' } }));
+    const porId = new Map(anulados.map((m) => [m.id, m]));
+    const despues = movs.map((m) => porId.get(m.id) || m).concat(agregar);
+    const negIdx = L.negativosPorCambioIdx(idx, quitar, agregar);
+    const negTodo = L.negativosPorCambio(movs, despues, L.clavesDe([...agregar, ...anulados]));
+    const orden = (a) => JSON.stringify([...a].sort((x, y) => (x.rodeoId + x.categoriaId < y.rodeoId + y.categoriaId ? -1 : 1)));
+    assert.equal(orden(negIdx), orden(negTodo), `paso ${paso}`);
+    idx = L.indiceConCambios(idx, quitar, agregar);
+    movs = despues;
+    const ref = L.construirIndice(movs);
+    for (const fecha of [null, '2026-03-15', '2026-07-01', '2026-12-31']) {
+      const a = [...idx.stockMapa(fecha)].filter(([, v]) => v !== 0).sort().join(';');
+      const b = [...L.calcularStock(movs, fecha)].filter(([, v]) => v !== 0).sort().join(';');
+      assert.equal(a, b, `paso ${paso} fecha ${fecha}`);
+      for (const k of ref.porClave.keys()) assert.equal(idx.stockA(k, fecha), ref.stockA(k, fecha));
+    }
+  }
+});
+
+test('textos de Datos más largos que el tope: se recortan con aviso, nunca se vacían ni se rechazan', () => {
+  const largo = 'Agroganadera '.repeat(40); // 520 caracteres
+  // Al importar: un texto largo NO es error; uno que no es texto sí.
+  const b = backupBueno(); b.parametros = { empresa: largo, potreros: 'p'.repeat(6000), motivosAjuste: ['m'.repeat(400), ...Array.from({ length: 60 }, (_, i) => 'mot ' + i)] };
+  assert.equal(L.validarBackup(b).ok, true, L.validarBackup(b).errores.join(' | '));
+  const b2 = backupBueno(); b2.parametros = { empresa: { no: 'texto' } };
+  assert.match(L.validarBackup(b2).errores.join(' | '), /Empresa.*tiene que ser un texto/);
+  // Normalizar (al importar o al abrir lo guardado): recorta al tope y dice cuánto tenía.
+  const def = { empresa: 'Mi campo', potreros: '', motivosAjuste: ['A'] };
+  const r = L.normalizarParametros(b.parametros, def);
+  assert.equal(r.parametros.empresa, largo.slice(0, 300));
+  assert.equal(r.parametros.empresa.length, 300);
+  assert.equal(r.parametros.potreros.length, 5000);
+  assert.equal(r.parametros.motivosAjuste.length, 50);
+  assert.equal(r.parametros.motivosAjuste[0].length, 300);
+  assert.deepEqual(r.arreglados, []);
+  const txt = r.recortados.map((x) => x.texto).join(' | ');
+  assert.match(txt, /"Empresa" tenía 520 caracteres; se guardaron los primeros 300/);
+  assert.match(txt, /"Potreros" tenía 6000 caracteres; se guardaron los primeros 5000/);
+  assert.match(txt, /"Motivos rápidos de ajuste" tenía 61 renglones; se guardaron los primeros 50/);
+  // Lo que entra en el tope no se toca ni se avisa.
+  const ok = L.normalizarParametros({ empresa: 'x'.repeat(300) }, def);
+  assert.equal(ok.parametros.empresa.length, 300);
+  assert.deepEqual(ok.recortados, []);
+});
+
+// ---------------- v0.4: modelo SENASA ----------------
+import * as SEED from '../app/seeds.js';
+
+const viejoEstado = () => ({
+  rodeos: [{ id: 'r-cola', nombre: 'Cola', orden: 1, activo: true }, { id: 'r-cut', nombre: 'CUT', orden: 2, activo: true }, { id: 'r-destetados', nombre: 'Destetados', orden: 3, activo: true }],
+  categorias: Object.keys(SEED.MAPEO_V03).map((id, i) => ({ id, nombre: id, orden: i + 1, activa: true, cuentaComoVaca: id === 'c-vacas' })).concat([{ id: 'c-propia', nombre: 'Propia', orden: 20, activa: true }]),
+  movimientos: [
+    { id: 'm1', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 134, origen: null, destino: { rodeoId: 'r-cola', categoriaId: 'c-vacas' } },
+    { id: 'm2', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 99, origen: null, destino: { rodeoId: 'r-cola', categoriaId: 'c-terneros' } },
+    { id: 'm3', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 5, origen: null, destino: { rodeoId: 'r-destetados', categoriaId: 'c-mamonesm' } },
+    { id: 'm4', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 12, origen: null, destino: { rodeoId: 'r-destetados', categoriaId: 'c-mamonesh' } },
+    { id: 'm5', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 3, origen: null, destino: { rodeoId: 'r-cut', categoriaId: 'c-cut' } },
+    { id: 'm6', fecha: '2026-11-02', tipo: 'mortandad', cantidad: 2, origen: { rodeoId: 'r-cola', categoriaId: 'c-padres' }, destino: null },
+    { id: 'm7', fecha: '2026-11-01', tipo: 'saldo_inicial', cantidad: 4, origen: null, destino: { rodeoId: 'r-cola', categoriaId: 'c-propia' } },
+  ],
+  conteos: [{ id: 'k1', fecha: '2026-11-01', rodeoId: 'r-cola', categoriaId: 'c-vacas', cantidad: 130 }],
+  parametros: { paricionDesde: '', campo: 'X' },
+});
+const opcionesMig = (extra = {}) => ({
+  mapeo: SEED.MAPEO_V03, categoriasNuevas: SEED.CATEGORIAS_INICIALES, rodeosNuevos: SEED.RODEOS_INICIALES, esperadasViejas: SEED.ESPERADAS_V03,
+  parametrosNuevos: { paricionDesde: '01/07', servicio: '20/09 al 20/12' }, hoy: '2026-11-03', ahoraIso: '2026-11-03T12:00:00.000Z', ...extra,
+});
+
+test('v0.4: detecta el modelo viejo y migra sin reescribir la historia (total igual, categorías nuevas)', () => {
+  const e = viejoEstado();
+  const nuevas = SEED.CATEGORIAS_INICIALES.map((c) => c.id);
+  assert.equal(L.esModeloViejo(e, SEED.MAPEO_V03, nuevas), true);
+  const antes = JSON.stringify(e);
+  const mg = L.migrarModeloV03(e, opcionesMig());
+  assert.equal(JSON.stringify(e), antes, 'no toca el estado recibido');
+  assert.equal(mg.limpio, false);
+  // la historia vieja queda igual: los primeros 7 movimientos son los mismos
+  assert.deepEqual(mg.estado.movimientos.slice(0, 7), e.movimientos);
+  const st0 = L.totales(L.calcularStock(e.movimientos)).total, st1 = L.totales(L.calcularStock(mg.estado.movimientos)).total;
+  assert.equal(st1, st0, 'el total de cabezas no cambia');
+  const s = L.calcularStock(mg.estado.movimientos);
+  assert.equal(s.get('r-cola|c-vaca'), 134); assert.equal(s.get('r-cola|c-vacas') || 0, 0);
+  assert.equal(s.get('r-cola|c-ternero-ss'), 99);
+  assert.equal(s.get('r-destetados|c-ternero'), 5); assert.equal(s.get('r-destetados|c-ternera'), 12);
+  assert.equal(s.get('r-cut|c-vaca'), 3, 'CUT (categoría) pasa a Vaca en el rodeo CUT');
+  assert.equal(s.get('r-cola|c-propia'), 4, 'una categoría propia del usuario no se toca');
+  // negativo: no se pasa y se avisa
+  assert.equal(s.get('r-cola|c-padres'), -2);
+  assert.equal(mg.avisos.length, 1);
+  assert.ok(mg.nuevos.every((m) => m.tipo === 'cambio_categoria' && m.motivo && m.fecha === '2026-11-03' && m.lote === mg.nuevos[0].lote));
+  // categorías viejas desactivadas con rastro; nuevas activas según el modelo
+  const cv = mg.estado.categorias.find((c) => c.id === 'c-vacas');
+  assert.equal(cv.activa, false); assert.equal(cv.reemplazadaPor, 'c-vaca');
+  assert.equal(mg.estado.categorias.find((c) => c.id === 'c-propia').activa, true);
+  assert.equal(mg.estado.categorias.find((c) => c.id === 'c-vaca').cuentaComoVaca, true);
+  // esperadas de los rodeos viejos y parámetros vacíos completados
+  assert.deepEqual(mg.estado.rodeos.find((r) => r.id === 'r-destetados').esperadas, ['c-ternero', 'c-ternera']);
+  assert.equal(mg.estado.parametros.paricionDesde, '01/07'); assert.equal(mg.estado.parametros.campo, 'X');
+  // el resultado es un backup válido y ya no es "modelo viejo"
+  const v = L.validarBackup(L.armarBackup(mg.estado, '2026-11-03T12:00:00.000Z'));
+  assert.ok(v.ok, v.errores.join('; '));
+  assert.equal(L.esModeloViejo(mg.estado, SEED.MAPEO_V03, nuevas), false);
+});
+
+test('v0.4: migración con fecha posterior a hoy usa la del último movimiento; sin datos arranca limpio', () => {
+  const e = viejoEstado();
+  e.movimientos.push({ id: 'm9', fecha: '2026-12-10', tipo: 'nacimiento', cantidad: 1, origen: null, destino: { rodeoId: 'r-cola', categoriaId: 'c-terneros' } });
+  const mg = L.migrarModeloV03(e, opcionesMig());
+  assert.ok(mg.nuevos.every((m) => m.fecha === '2026-12-10'));
+  const vac = { ...viejoEstado(), movimientos: [], conteos: [] };
+  const mg2 = L.migrarModeloV03(vac, opcionesMig());
+  assert.equal(mg2.limpio, true);
+  assert.deepEqual(mg2.estado.categorias.map((c) => c.id), SEED.CATEGORIAS_INICIALES.map((c) => c.id));
+  assert.deepEqual(mg2.estado.rodeos.map((r) => r.id), SEED.RODEOS_INICIALES.map((r) => r.id));
+});
+
+test('v0.4: caravanas (fase 2) en movimientos y método/lecturas en conteos se validan', () => {
+  const base = { id: 'a', fecha: '2026-11-01', tipo: 'mortandad', cantidad: 1, origen: { rodeoId: 'r', categoriaId: 'c' }, destino: null };
+  assert.deepEqual(L.validarMovimiento({ ...base, caravanas: ['032010011002541'] }), []);
+  assert.ok(L.validarMovimiento({ ...base, caravanas: 'x' }).length);
+  assert.ok(L.validarMovimiento({ ...base, caravanas: [{}] }).length);
+  const b = L.armarBackup({ rodeos: [{ id: 'r', nombre: 'R', esperadas: ['c'] }], categorias: [{ id: 'c', nombre: 'C', sexo: 'H', bovino: true }], movimientos: [],
+    conteos: [{ id: 'k', fecha: '2026-11-01', rodeoId: 'r', categoriaId: 'c', cantidad: 3, metodo: 'bastón', lecturas: ['1', '2', '3'] }], parametros: {} }, '2026-11-01T00:00:00Z');
+  assert.ok(L.validarBackup(b).ok);
+  assert.deepEqual(b.caravanas, []);
+  const mal = structuredClone(b); mal.conteos[0].metodo = 'telepatía';
+  assert.match(L.validarBackup(mal).errores.join(' '), /método/);
+  const mal2 = structuredClone(b); mal2.categorias[0].sexo = 'X';
+  assert.match(L.validarBackup(mal2).errores.join(' '), /sexo/);
+  const mal3 = structuredClone(b); mal3.rodeos[0].esperadas = 'c';
+  assert.match(L.validarBackup(mal3).errores.join(' '), /esperadas/);
+  const mal4 = structuredClone(b); mal4.caravanas = {};
+  assert.match(L.validarBackup(mal4).errores.join(' '), /caravanas/);
+});
+
+test('v0.4: plantilla Excel de saldo inicial: lee fechas en varios formatos y rechaza celdas malas por fila y columna', () => {
+  const rodeos = [{ id: 'r-a', nombre: 'A', activo: true }, { id: 'r-b', nombre: 'B', activo: true }];
+  const cats = [{ id: 'c-vaca', nombre: 'Vaca' }, { id: 'c-toro', nombre: 'Toro' }];
+  const hoja = (fecha, filasR) => [['Saldo inicial'], ['Fecha', fecha], ['instrucciones'], [], ['Rodeo', 'Vaca', 'Toro', 'rodeo_id (no tocar)'], ['id', 'c-vaca', 'c-toro', 'rodeo_id'], ...filasR];
+  let r = L.leerPlantillaSaldo(hoja('03/11/2026', [['A', 10, null, 'r-a'], ['B', '5', 2, 'r-b']]), rodeos, cats);
+  assert.ok(r.ok, r.errores?.join(';'));
+  assert.equal(r.fecha, '2026-11-03'); assert.equal(r.cabezas, 17); assert.equal(r.renglones.length, 3);
+  r = L.leerPlantillaSaldo(hoja(new Date(Date.UTC(2026, 10, 3)), [['A', 1, null, 'r-a']]), rodeos, cats);
+  assert.equal(r.fecha, '2026-11-03');
+  r = L.leerPlantillaSaldo(hoja(46329, [['A', 1, null, 'r-a']]), rodeos, cats); // serie de Excel
+  assert.equal(r.fecha, '2026-11-03');
+  r = L.leerPlantillaSaldo(hoja('31/02/2026', [['A', 'diez', -1, 'r-a'], ['X', 1, 1, 'r-x'], ['A', 1, 1, 'r-a']]), rodeos, cats);
+  assert.equal(r.ok, false);
+  const t = r.errores.join(' | ');
+  assert.match(t, /fecha/); assert.match(t, /Fila 7 \(A\), columna Vaca: «diez»/); assert.match(t, /columna Toro/);
+  assert.match(t, /rodeo no existe/); assert.match(t, /repetido/);
+  r = L.leerPlantillaSaldo(hoja('03/11/2026', [['A', null, null, 'r-a']]), rodeos, cats);
+  assert.equal(r.ok, false); assert.match(r.errores[0], /ninguna cantidad/);
+  r = L.leerPlantillaSaldo([['cualquier cosa']], rodeos, cats);
+  assert.equal(r.ok, false);
+});
+
+test('v0.4: atajos del modelo estándar apuntan a categorías y rodeos que existen en la precarga', () => {
+  const cIds = new Set(SEED.CATEGORIAS_INICIALES.map((c) => c.id)), rIds = new Set(SEED.RODEOS_INICIALES.map((r) => r.id));
+  for (const a of SEED.ATAJOS) for (const f of a.filas) {
+    assert.ok(cIds.has(f.catO) && cIds.has(f.cat), `${a.id}: categorías`);
+    if (f.rodeo) assert.ok(rIds.has(f.rodeo), `${a.id}: rodeo ${f.rodeo}`);
+  }
+  // Destete y Tacto son traslados (no cambian la categoría)
+  for (const id of ['destete', 'tacto']) assert.ok(SEED.ATAJOS.find((a) => a.id === id).filas.every((f) => f.catO === f.cat));
+  // CUT, Vacías y Mamones son rodeos, no categorías
+  const nombresCat = SEED.CATEGORIAS_INICIALES.map((c) => c.nombre.toLowerCase());
+  for (const n of ['cut', 'vacías', 'mamones']) assert.ok(!nombresCat.includes(n));
+  assert.ok(SEED.RODEOS_INICIALES.some((r) => r.id === 'r-cut') && SEED.RODEOS_INICIALES.some((r) => r.id === 'r-mamones'));
+});

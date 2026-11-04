@@ -206,3 +206,15 @@ td .ubic { display: block; font-size: 16px; color: var(--gris); }
 .inf-dif { border: 1px solid #555; border-radius: 6px; padding: 8px 10px; margin: 6px 0; }
 .conf-vieja { color: #666; }
 .conf-vieja s { color: #666; }
+
+/* Contador de caracteres debajo de las casillas de Datos */
+.contador { display: block; font-size: 16px; color: var(--gris); margin-top: 4px; }
+
+/* v0.4: categorías plegadas, totales en vivo del saldo inicial, vista previa de la plantilla */
+details.otras { border-style: dashed; }
+details.otras summary { min-height: 48px; display: flex; align-items: center; font-weight: bold; cursor: pointer; }
+.total-vivo { position: sticky; top: 0; z-index: 2; background: var(--vp); border: 2px solid var(--v); border-radius: 10px; padding: 10px 12px; font-size: 20px; margin: 10px 0; }
+.fila-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: baseline; }
+.tabla-mini { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.tabla-mini td { padding: 6px 4px; border-bottom: 1px solid #ccc; overflow-wrap: anywhere; }
+.tabla-mini td.n { text-align: right; white-space: nowrap; }
