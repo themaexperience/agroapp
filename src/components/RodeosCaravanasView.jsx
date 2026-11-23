@@ -49,6 +49,7 @@ import {
   ShieldCheck,
   FileText,
   Upload,
+  Users,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatFechaAR, formatFechaHoraCorteAR } from '../utils/dateHelper';
@@ -702,6 +703,8 @@ export default function RodeosCaravanasView({
   // Modo Lectura vs Modo Edición para evitar toques accidentales de steppers durante el scroll
   const [globalEditMode, setGlobalEditMode] = useState(false);
   const [editingRodeoIds, setEditingRodeoIds] = useState(new Set());
+  const [editingRodeoDrawer, setEditingRodeoDrawer] = useState(null);
+  const [savingRodeoDrawer, setSavingRodeoDrawer] = useState(false);
 
   const isRodeoEditing = useCallback(
     (id) => globalEditMode || editingRodeoIds.has(id),
@@ -843,7 +846,7 @@ export default function RodeosCaravanasView({
       rodeos.forEach((r) => {
         // REGLA 2: Si la fila está en edición o tiene guardado en vuelo (dirtyRows),
         // está TERMINANTEMENTE PROHIBIDO sobreescribir los valores locales.
-        if (dirtyRowsRef.current.has(r.id) || editingRodeoIds.has(r.id) || globalEditMode) {
+        if (dirtyRowsRef.current.has(r.id) || editingRodeoIds.has(r.id) || globalEditMode || (editingRodeoDrawer && editingRodeoDrawer.id === r.id)) {
           return;
         }
 
@@ -1443,6 +1446,61 @@ export default function RodeosCaravanasView({
   async function handleSaveRodeoRow(rodeoId) {
     await autoSaveRodeo(rodeoId, editedRodeos[rodeoId], false);
   }
+
+  // Guardar cambios aplicados desde el Drawer Lateral Limpio de Edición
+  const handleSaveRodeoDrawer = async () => {
+    if (!editingRodeoDrawer) return;
+    const rodeoId = editingRodeoDrawer.id;
+    setSavingRodeoDrawer(true);
+    try {
+      const r = editingRodeoDrawer;
+      const m = parseInt(r.terneros_machos, 10) || 0;
+      const h = parseInt(r.terneros_hembras, 10) || 0;
+      const tTotal = m + h > 0 ? m + h : (parseInt(r.terneros, 10) || 0);
+
+      const potNum =
+        r.potrero_numero !== '' && r.potrero_numero != null
+          ? parseInt(r.potrero_numero, 10)
+          : null;
+
+      const finalPayload = {
+        ...r,
+        nombre: String(r.nombre || '').trim(),
+        rol_protocolo: r.rol_protocolo || inferirRolProtocolo(r),
+        potrero_numero: !Number.isNaN(potNum) ? potNum : null,
+        vacas: parseInt(r.vacas, 10) || 0,
+        terneros: tTotal,
+        terneros_machos: m,
+        terneros_hembras: h,
+        toros_padres: parseInt(r.toros_padres, 10) || 0,
+        toritos: parseInt(r.toritos, 10) || 0,
+        vacas_cut: parseInt(r.vacas_cut, 10) || 0,
+        vaquillonas_reposicion: parseInt(r.vaquillonas_reposicion, 10) || 0,
+        condicion_corporal: parseFloat(r.condicion_corporal) || 3.0,
+        dias_estimados_pastoreo: parseInt(r.dias_estimados_pastoreo, 10) || 30,
+        toro_lote_asignado: r.toro_lote_asignado?.trim() || null,
+      };
+
+      // Actualizar estado local reactivo inmediato
+      setEditedRodeos((prev) => ({
+        ...prev,
+        [rodeoId]: finalPayload,
+      }));
+      editedRodeosRef.current = {
+        ...editedRodeosRef.current,
+        [rodeoId]: finalPayload,
+      };
+      pendingRowsRef.current[rodeoId] = finalPayload;
+
+      await autoSaveRodeo(rodeoId, finalPayload, false);
+      setEditingRodeoDrawer(null);
+    } catch (err) {
+      console.error('Error al guardar desde drawer de rodeo:', err);
+      notify(`Error al guardar: ${err.message}`, 'error');
+    } finally {
+      setSavingRodeoDrawer(false);
+    }
+  };
 
   // Crear un nuevo Rodeo en la planilla
   async function handleCreateNewRodeo(e) {
@@ -5960,54 +6018,24 @@ export default function RodeosCaravanasView({
 
                         {/* 2. Potrero + Días Permanencia + Hectáreas */}
                         <td className="p-1.5 min-w-[135px] max-w-[155px] align-middle">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <select
-                                value={edit.potrero_numero ?? ''}
-                                onChange={(e) => updateRodeoField(r.id, 'potrero_numero', e.target.value, true)}
-                                className="w-full px-2 py-1.5 rounded-lg border border-slate-300 bg-white font-bold text-slate-900 text-xs truncate"
+                          <div className="flex items-center justify-between gap-1 px-1 py-0.5">
+                            <span
+                              className="font-extrabold text-xs text-slate-900 truncate"
+                              title={potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero')}
+                            >
+                              {potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero')}
+                            </span>
+                            {edit.potrero_numero && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
+                                className="p-1 rounded-md text-emerald-800 hover:bg-emerald-50 shrink-0 cursor-pointer transition"
+                                title="Ver en Mapa"
                               >
-                                <option value="">Sin potrero</option>
-                                {potreros.map((p) => {
-                                  const cleanLabel = p.nombre || formatPotreroNum(p.numero);
-                                  return (
-                                    <option key={p.numero} value={p.numero}>
-                                      {cleanLabel}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                              {edit.potrero_numero && (
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
-                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 shrink-0 cursor-pointer transition"
-                                  title="Ver en Mapa"
-                                >
-                                  <MapPin className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between gap-1 px-1 py-0.5">
-                              <span
-                                className="font-extrabold text-xs text-slate-900 truncate"
-                                title={potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero')}
-                              >
-                                {potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero')}
-                              </span>
-                              {edit.potrero_numero && (
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
-                                  className="p-1 rounded-md text-emerald-800 hover:bg-emerald-50 shrink-0 cursor-pointer transition"
-                                  title="Ver en Mapa"
-                                >
-                                  <MapPin className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          )}
+                                <MapPin className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                           {edit.potrero_numero && (() => {
                             const perm = calcPermanenciaPotrero(edit, fechaOperacion);
                             const diasActuales = perm.dias;
@@ -6052,33 +6080,16 @@ export default function RodeosCaravanasView({
                           })()}
                         </td>
 
-                        {/* 3. Vacas con Stepper Táctil (o Número Grande en Modo Lectura) */}
+                        {/* 3. Vacas (Número Grande en Modo Lectura) */}
                         <td className="p-1 text-center align-middle min-w-[65px] max-w-[75px]">
-                          {isEditing ? (
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="block text-[8px] font-bold text-slate-500 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                Vacas
-                              </span>
-                              <AnimalStepperInput
-                                value={edit.vacas ?? 0}
-                                colorTheme="slate"
-                                inputWidth="w-12"
-                                onChange={(val) => updateRodeoField(r.id, 'vacas', val, false)}
-                                onBlur={(e) => handleRodeoBlur(r.id, 'vacas', e)}
-                                ariaLabel="Vacas"
-                                title="Vacas del rodeo"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-1">
-                              <span className="text-sm font-black text-slate-900 tabular-nums">
-                                {Number(edit.vacas || 0).toLocaleString('es-AR')}
-                              </span>
-                              <span className="text-[9px] font-bold text-slate-500 uppercase">
-                                Vacas
-                              </span>
-                            </div>
-                          )}
+                          <div className="flex flex-col items-center justify-center py-1">
+                            <span className="text-sm font-black text-slate-900 tabular-nums">
+                              {Number(edit.vacas || 0).toLocaleString('es-AR')}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase">
+                              Vacas
+                            </span>
+                          </div>
                         </td>
 
                         {/* 4. Terneros Unificados (Tot · M / H) */}
@@ -6091,82 +6102,6 @@ export default function RodeosCaravanasView({
                             const cantTerneros = isSexed ? cantM + cantH : (parseInt(edit.terneros, 10) || 0);
                             const pctAlPie = cantVacas > 0 ? Math.round((cantTerneros / cantVacas) * 100) : null;
 
-                            if (isEditing) {
-                              return (
-                                <div className="flex flex-col items-center justify-center">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    {/* Total Terneros */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="block text-[8px] font-extrabold text-emerald-900 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                        Tot
-                                      </span>
-                                      <AnimalStepperInput
-                                        value={edit.terneros ?? 0}
-                                        disabled={isSexed}
-                                        colorTheme="emerald"
-                                        inputWidth="w-11"
-                                        onChange={(val) => updateRodeoField(r.id, 'terneros', val, false)}
-                                        onBlur={(e) => handleRodeoBlur(r.id, 'terneros', e)}
-                                        ariaLabel="Terneros Total"
-                                        title={isSexed ? 'TOT = M + H (calculado automáticamente)' : 'Sin sexar: editar total directamente'}
-                                      />
-                                    </div>
-
-                                    {/* Machos M */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="block text-[8px] font-bold text-sky-800 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                        M
-                                      </span>
-                                      <AnimalStepperInput
-                                        value={edit.terneros_machos ?? 0}
-                                        colorTheme="sky"
-                                        inputWidth="w-11"
-                                        onChange={(val) => updateRodeoField(r.id, 'terneros_machos', val, false)}
-                                        onBlur={(e) => handleRodeoBlur(r.id, 'terneros_machos', e)}
-                                        ariaLabel="Terneros Machos"
-                                        title="Terneros Machos (M)"
-                                      />
-                                    </div>
-
-                                    {/* Hembras H */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="block text-[8px] font-bold text-rose-800 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                        H
-                                      </span>
-                                      <AnimalStepperInput
-                                        value={edit.terneros_hembras ?? 0}
-                                        colorTheme="rose"
-                                        inputWidth="w-11"
-                                        onChange={(val) => updateRodeoField(r.id, 'terneros_hembras', val, false)}
-                                        onBlur={(e) => handleRodeoBlur(r.id, 'terneros_hembras', e)}
-                                        ariaLabel="Terneros Hembras"
-                                        title="Terneros Hembras (H)"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Mini badge con porcentaje de terneros al pie (cuando vacas > 0) */}
-                                  {pctAlPie != null && (
-                                    <div className="mt-1 flex justify-center">
-                                      <span
-                                        className={`inline-block px-1.5 py-0.2 rounded-full text-[9px] font-extrabold tracking-tight border ${
-                                          pctAlPie >= 80
-                                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                            : pctAlPie >= 60
-                                            ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                            : 'bg-slate-100 text-slate-700 border-slate-300'
-                                        }`}
-                                        title={`Terneros al pie: ${cantTerneros} terneros / ${cantVacas} vacas (${pctAlPie}%)`}
-                                      >
-                                        {pctAlPie}% al pie
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }
-
-                            // Modo Lectura Limpio
                             return (
                               <div className="flex flex-col items-center justify-center py-1">
                                 <div className="flex items-center gap-1.5">
@@ -6205,71 +6140,6 @@ export default function RodeosCaravanasView({
                             const cantToritos = parseInt(edit.toritos, 10) || 0;
                             const totalToros = cantPadres + cantToritos;
 
-                            if (isEditing) {
-                              return (
-                                <div className="flex flex-col items-center justify-center">
-                                  <div className="flex items-center justify-center gap-1.5 mb-1.5">
-                                    {/* Toros Padres */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="block text-[8px] font-bold text-slate-500 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                        Padres
-                                      </span>
-                                      <AnimalStepperInput
-                                        value={edit.toros_padres ?? 0}
-                                        colorTheme="slate"
-                                        inputWidth="w-11"
-                                        onChange={(val) => updateRodeoField(r.id, 'toros_padres', val, false)}
-                                        onBlur={(e) => handleRodeoBlur(r.id, 'toros_padres', e)}
-                                        ariaLabel="Toros Padres"
-                                        title="Toros Padres"
-                                      />
-                                    </div>
-
-                                    {/* Toritos */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="block text-[8px] font-bold text-slate-500 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                        Toritos
-                                      </span>
-                                      <AnimalStepperInput
-                                        value={edit.toritos ?? 0}
-                                        colorTheme="slate"
-                                        inputWidth="w-11"
-                                        onChange={(val) => updateRodeoField(r.id, 'toritos', val, false)}
-                                        onBlur={(e) => handleRodeoBlur(r.id, 'toritos', e)}
-                                        ariaLabel="Toritos"
-                                        title="Toritos"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Input de lote y botón de ficha reproductiva */}
-                                  <div className="flex items-center justify-center gap-1 w-full max-w-[195px] mx-auto">
-                                    <input
-                                      type="text"
-                                      placeholder="Lote/Toros..."
-                                      value={edit.toro_lote_asignado ?? ''}
-                                      onChange={(e) => updateRodeoField(r.id, 'toro_lote_asignado', e.target.value, false)}
-                                      onBlur={(e) => handleRodeoBlur(r.id, 'toro_lote_asignado', e)}
-                                      className="w-full px-1.5 py-0.5 rounded border border-slate-200 text-[10px] bg-white text-slate-800"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => openReproductiveModal(r)}
-                                      className={`p-1 rounded border shrink-0 transition cursor-pointer ${
-                                        edit.toros_padres > 0 || edit.fecha_entore || edit.manejo_iatf || edit.toros_en_servicio
-                                          ? 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
-                                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                                      }`}
-                                      title="Abrir Ficha de Gestión Reproductiva (Toros, Entore, IATF, Tacto)"
-                                    >
-                                      <Calendar className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // Modo Lectura Limpio
                             return (
                               <div className="flex flex-col items-center justify-center py-1">
                                 <div className="flex items-center gap-1.5">
@@ -6283,7 +6153,7 @@ export default function RodeosCaravanasView({
                                     <button
                                       type="button"
                                       onClick={() => openReproductiveModal(r)}
-                                      className="p-0.5 rounded text-purple-700 hover:bg-purple-50 transition"
+                                      className="p-0.5 rounded text-purple-700 hover:bg-purple-50 transition cursor-pointer"
                                       title="Ver Ficha Reproductiva"
                                     >
                                       <Calendar className="w-3 h-3" />
@@ -6306,45 +6176,6 @@ export default function RodeosCaravanasView({
                             const cantVaq = parseInt(edit.vaquillonas_reposicion, 10) || 0;
                             const cantCut = parseInt(edit.vacas_cut, 10) || 0;
 
-                            if (isEditing) {
-                              return (
-                                <div className="flex items-center justify-center gap-1.5">
-                                  {/* Vaquillonas Reposición */}
-                                  <div className="flex flex-col items-center">
-                                    <span className="block text-[8px] font-bold text-purple-800 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                      Vaq. Rep.
-                                    </span>
-                                    <AnimalStepperInput
-                                      value={edit.vaquillonas_reposicion ?? 0}
-                                      colorTheme="purple"
-                                      inputWidth="w-11"
-                                      onChange={(val) => updateRodeoField(r.id, 'vaquillonas_reposicion', val, false)}
-                                      onBlur={(e) => handleRodeoBlur(r.id, 'vaquillonas_reposicion', e)}
-                                      ariaLabel="Vaquillonas Reposición"
-                                      title="Vaquillonas Reposición"
-                                    />
-                                  </div>
-
-                                  {/* Vacas CUT */}
-                                  <div className="flex flex-col items-center">
-                                    <span className="block text-[8px] font-bold text-amber-800 uppercase mb-1 h-3.5 flex items-center justify-center">
-                                      CUT
-                                    </span>
-                                    <AnimalStepperInput
-                                      value={edit.vacas_cut ?? 0}
-                                      colorTheme="amber"
-                                      inputWidth="w-11"
-                                      onChange={(val) => updateRodeoField(r.id, 'vacas_cut', val, false)}
-                                      onBlur={(e) => handleRodeoBlur(r.id, 'vacas_cut', e)}
-                                      ariaLabel="Vacas CUT"
-                                      title="Vacas CUT"
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // Modo Lectura Limpio
                             return (
                               <div className="flex flex-col items-center justify-center py-1">
                                 <div className="text-[11px] font-extrabold text-slate-800">
@@ -6370,7 +6201,7 @@ export default function RodeosCaravanasView({
                           />
                         </td>
 
-                        {/* 8. STICKY RIGHT: Total Cabezas + ✏️ Editar / ✓ Listo + ⚡ Acciones */}
+                        {/* 8. STICKY RIGHT: Total Cabezas + ✏️ Editar + ⚡ Acciones */}
                         <td className="p-2 text-right whitespace-nowrap sticky right-0 z-20 bg-white border-l border-slate-200/80 shadow-[-6px_0_16px_-4px_rgba(15,23,42,0.08)] min-w-[185px] align-middle">
                           <div className="inline-flex items-center justify-end gap-2.5">
                             {/* Total Cabezas y carga cab/ha */}
@@ -6395,18 +6226,15 @@ export default function RodeosCaravanasView({
                               })()}
                             </div>
 
-                            {/* Botón Modo Edición Individual */}
+                            {/* Botón Editar Rodeo (Abre Drawer Lateral) */}
                             <button
                               type="button"
-                              onClick={() => toggleRodeoEdit(r.id)}
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer shrink-0 ${
-                                isEditing
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                              }`}
-                              title={isEditing ? 'Cerrar modo edición y guardar' : 'Habilitar edición con steppers'}
+                              onClick={() => setEditingRodeoDrawer({ ...(editedRodeos[r.id] || r) })}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 hover:text-slate-900 flex items-center gap-1"
+                              title="Editar categorías y datos del rodeo"
                             >
-                              {isEditing ? '✓ Listo' : '✏️ Editar'}
+                              <span>✏️</span>
+                              <span>Editar</span>
                             </button>
 
                             {/* Botón ⚡ Acciones */}
@@ -6595,18 +6423,14 @@ export default function RodeosCaravanasView({
                         </div>
                       </div>
 
-                      {/* Total Cabezas, carga y botón Modo Edición / Listo */}
+                      {/* Total Cabezas, carga y botón Modo Edición */}
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() => toggleRodeoEdit(r.id)}
-                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer shrink-0 ${
-                            isEditing
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                          }`}
+                          onClick={() => setEditingRodeoDrawer({ ...(editedRodeos[r.id] || r) })}
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
                         >
-                          {isEditing ? '✓ Listo' : '✏️ Editar'}
+                          ✏️ Editar
                         </button>
 
                         <div className="text-right shrink-0 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/80">
@@ -6624,53 +6448,23 @@ export default function RodeosCaravanasView({
 
                     {/* POTRERO Y DÍAS DE PASTOREO EN ANCHO COMPLETO */}
                     <div className="space-y-1">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            value={edit.potrero_numero ?? ''}
-                            onChange={(e) => updateRodeoField(r.id, 'potrero_numero', e.target.value, true)}
-                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs"
+                      <div className="flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                          <span className="font-extrabold text-slate-900 truncate">
+                            {potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero asignado')}
+                          </span>
+                        </div>
+                        {edit.potrero_numero && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
+                            className="text-[11px] font-bold text-emerald-800 hover:underline shrink-0"
                           >
-                            <option value="">Sin potrero asignado</option>
-                            {potreros.map((p) => {
-                              const cleanLabel = p.nombre || formatPotreroNum(p.numero);
-                              return (
-                                <option key={p.numero} value={p.numero}>
-                                  {cleanLabel}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          {edit.potrero_numero && (
-                            <button
-                              type="button"
-                              onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
-                              className="p-2 rounded-xl bg-emerald-50 text-emerald-800 shrink-0"
-                              title="Ver en Mapa"
-                            >
-                              <MapPin className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                            <span className="font-extrabold text-slate-900 truncate">
-                              {potreros.find((p) => String(p.numero) === String(edit.potrero_numero))?.nombre || (edit.potrero_numero ? formatPotreroNum(edit.potrero_numero) : 'Sin potrero asignado')}
-                            </span>
-                          </div>
-                          {edit.potrero_numero && (
-                            <button
-                              type="button"
-                              onClick={() => onSelectPotreroInMap(Number(edit.potrero_numero))}
-                              className="text-[11px] font-bold text-emerald-800 hover:underline shrink-0"
-                            >
-                              Ver en mapa
-                            </button>
-                          )}
-                        </div>
-                      )}
+                            Ver en mapa
+                          </button>
+                        )}
+                      </div>
                       {perm && (
                         <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold px-1">
                           <span>{perm.dias}d de pastoreo {haRaw > 0 ? `· ${Math.round(haRaw)} ha` : ''}</span>
@@ -6679,156 +6473,61 @@ export default function RodeosCaravanasView({
                       )}
                     </div>
 
-                    {/* CUERPO: MODO EDICIÓN CON STEPPERS VS MODO LECTURA LIMPIO */}
-                    {isEditing ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
-                        {/* Vacas */}
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-slate-500 mb-1">Vacas</span>
-                          <AnimalStepperInput
-                            value={edit.vacas ?? 0}
-                            colorTheme="slate"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'vacas', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'vacas', e)}
-                            ariaLabel="Vacas"
-                          />
+                    {/* CUERPO: MODO LECTURA LIMPIO (4 BLOQUES ORDENADOS) */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                      {/* Vacas */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
+                        <div className="text-base font-black text-slate-900 tabular-nums">
+                          {Number(edit.vacas || 0).toLocaleString('es-AR')}
                         </div>
-
-                        {/* Terneros M */}
-                        <div className="bg-white p-2 rounded-xl border border-sky-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-sky-800 mb-1">Terneros M</span>
-                          <AnimalStepperInput
-                            value={edit.terneros_machos ?? 0}
-                            colorTheme="sky"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'terneros_machos', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'terneros_machos', e)}
-                            ariaLabel="Terneros Machos"
-                          />
-                        </div>
-
-                        {/* Terneros H */}
-                        <div className="bg-white p-2 rounded-xl border border-rose-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-rose-800 mb-1">Terneros H</span>
-                          <AnimalStepperInput
-                            value={edit.terneros_hembras ?? 0}
-                            colorTheme="rose"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'terneros_hembras', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'terneros_hembras', e)}
-                            ariaLabel="Terneros Hembras"
-                          />
-                        </div>
-
-                        {/* Toros Padres */}
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-slate-500 mb-1">Padres</span>
-                          <AnimalStepperInput
-                            value={edit.toros_padres ?? 0}
-                            colorTheme="slate"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'toros_padres', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'toros_padres', e)}
-                            ariaLabel="Toros Padres"
-                          />
-                        </div>
-
-                        {/* Toritos */}
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-slate-500 mb-1">Toritos</span>
-                          <AnimalStepperInput
-                            value={edit.toritos ?? 0}
-                            colorTheme="slate"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'toritos', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'toritos', e)}
-                            ariaLabel="Toritos"
-                          />
-                        </div>
-
-                        {/* Vaquillonas Reposición */}
-                        <div className="bg-white p-2 rounded-xl border border-purple-200 text-center flex flex-col items-center">
-                          <span className="block text-[9px] font-bold uppercase text-purple-800 mb-1">Vaq. Rep.</span>
-                          <AnimalStepperInput
-                            value={edit.vaquillonas_reposicion ?? 0}
-                            colorTheme="purple"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'vaquillonas_reposicion', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'vaquillonas_reposicion', e)}
-                            ariaLabel="Vaquillonas Reposición"
-                          />
-                        </div>
-
-                        {/* Vacas CUT */}
-                        <div className="bg-white p-2 rounded-xl border border-amber-200 text-center flex flex-col items-center col-span-2 sm:col-span-1">
-                          <span className="block text-[9px] font-bold uppercase text-amber-800 mb-1">Vacas CUT</span>
-                          <AnimalStepperInput
-                            value={edit.vacas_cut ?? 0}
-                            colorTheme="amber"
-                            inputWidth="w-10"
-                            onChange={(val) => updateRodeoField(r.id, 'vacas_cut', val, false)}
-                            onBlur={(e) => handleRodeoBlur(r.id, 'vacas_cut', e)}
-                            ariaLabel="Vacas CUT"
-                          />
-                        </div>
+                        <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">Vacas</div>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
-                        {/* Vacas */}
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
-                          <div className="text-base font-black text-slate-900 tabular-nums">
-                            {Number(edit.vacas || 0).toLocaleString('es-AR')}
-                          </div>
-                          <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">Vacas</div>
-                        </div>
 
-                        {/* Terneros Total Destacado */}
-                        <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 text-center flex flex-col items-center justify-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-base font-black text-emerald-950 tabular-nums">
-                              {cantTerneros}
+                      {/* Terneros Total Destacado */}
+                      <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 text-center flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-base font-black text-emerald-950 tabular-nums">
+                            {cantTerneros}
+                          </span>
+                          {pctAlPie != null && (
+                            <span
+                              className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border ${
+                                pctAlPie >= 80
+                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                  : 'bg-amber-100 text-amber-900 border-amber-300'
+                              }`}
+                            >
+                              {pctAlPie}%
                             </span>
-                            {pctAlPie != null && (
-                              <span
-                                className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border ${
-                                  pctAlPie >= 80
-                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                    : 'bg-amber-100 text-amber-900 border-amber-300'
-                                }`}
-                              >
-                                {pctAlPie}%
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[9px] font-extrabold uppercase text-emerald-900 mt-0.5">
-                            Terneros ({cantM} M · {cantH} H)
-                          </div>
+                          )}
                         </div>
-
-                        {/* Toros Padres + Toritos */}
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
-                          <div className="text-base font-black text-slate-900 tabular-nums">
-                            {totalToros}
-                          </div>
-                          <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">
-                            Toros ({cantPadres} P · {cantToritos} T)
-                          </div>
-                        </div>
-
-                        {/* Vaquillonas y CUT */}
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
-                          <div className="text-xs font-black text-slate-900 tabular-nums pt-0.5">
-                            <span className="text-purple-900">{cantVaq} Vaq.</span>
-                            <span className="mx-1 text-slate-300">·</span>
-                            <span className="text-amber-900">{cantCut} CUT</span>
-                          </div>
-                          <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">
-                            Recría & Descarte
-                          </div>
+                        <div className="text-[9px] font-extrabold uppercase text-emerald-900 mt-0.5">
+                          Terneros ({cantM} M · {cantH} H)
                         </div>
                       </div>
-                    )}
+
+                      {/* Toros Padres + Toritos */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
+                        <div className="text-base font-black text-slate-900 tabular-nums">
+                          {totalToros}
+                        </div>
+                        <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">
+                          Toros ({cantPadres} P · {cantToritos} T)
+                        </div>
+                      </div>
+
+                      {/* Vaquillonas y CUT */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-center flex flex-col items-center justify-center">
+                        <div className="text-xs font-black text-slate-900 tabular-nums pt-0.5">
+                          <span className="text-purple-900">{cantVaq} Vaq.</span>
+                          <span className="mx-1 text-slate-300">·</span>
+                          <span className="text-amber-900">{cantCut} CUT</span>
+                        </div>
+                        <div className="text-[9px] font-extrabold uppercase text-slate-500 mt-0.5">
+                          Recría & Descarte
+                        </div>
+                      </div>
+                    </div>
 
 {/* PIE DE TARJETA: Condición Corporal + Botón ⚡ Acciones Ancho Completo */}
                     <div className="flex items-center justify-between gap-2 pt-1">
@@ -10318,6 +10017,483 @@ export default function RodeosCaravanasView({
         onRefresh={onRefresh}
         notify={notify}
       />
+
+      {/* Drawer Lateral Derecho Limpio de Edición de Categorías (Field Daylight UI) */}
+      {editingRodeoDrawer && (() => {
+        const r = editingRodeoDrawer;
+        const cantVacas = parseInt(r.vacas, 10) || 0;
+        const cantM = parseInt(r.terneros_machos, 10) || 0;
+        const cantH = parseInt(r.terneros_hembras, 10) || 0;
+        const cantTerneros = cantM + cantH > 0 ? cantM + cantH : (parseInt(r.terneros, 10) || 0);
+        const cantPadres = parseInt(r.toros_padres, 10) || 0;
+        const cantToritos = parseInt(r.toritos, 10) || 0;
+        const totalToros = cantPadres + cantToritos;
+        const cantVaq = parseInt(r.vaquillonas_reposicion, 10) || 0;
+        const cantCut = parseInt(r.vacas_cut, 10) || 0;
+        const totalCabezas = cantVacas + cantTerneros + totalToros + cantVaq + cantCut;
+
+        const potreroObj = potreros.find((p) => Number(p.numero) === Number(r.potrero_numero));
+        const haRaw = potreroObj ? (parseFloat(String(potreroObj.hectareas).replace(',', '.')) || 0) : 0;
+        const cargaInstantanea = haRaw > 0 ? (totalCabezas / haRaw).toFixed(2) : null;
+        const pctAlPie = cantVacas > 0 ? Math.round((cantTerneros / cantVacas) * 100) : null;
+
+        const updateDrawerField = (field, val) => {
+          setEditingRodeoDrawer((prev) => {
+            const next = { ...prev, [field]: val };
+            if (field === 'terneros_machos' || field === 'terneros_hembras') {
+              const m = parseInt(field === 'terneros_machos' ? val : next.terneros_machos, 10) || 0;
+              const h = parseInt(field === 'terneros_hembras' ? val : next.terneros_hembras, 10) || 0;
+              if (m + h > 0) next.terneros = m + h;
+            }
+            return next;
+          });
+        };
+
+        const handleStepDrawer = (field, delta) => {
+          const current = parseInt(r[field], 10) || 0;
+          const nextVal = Math.max(0, current + delta);
+          updateDrawerField(field, nextVal);
+        };
+
+        return (
+          <div className="fixed inset-0 z-[1200] overflow-hidden flex justify-end">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+              onClick={() => !savingRodeoDrawer && setEditingRodeoDrawer(null)}
+            />
+
+            {/* Panel Lateral Drawer */}
+            <div className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 text-slate-900 z-10 animate-in slide-in-from-right duration-200">
+              {/* Encabezado Daylight UI */}
+              <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/80 flex items-start justify-between shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+                      <Users className="w-5 h-5" />
+                    </span>
+                    <h2 className="text-lg font-black text-slate-900">
+                      Editar Rodeo: <span className="text-emerald-800">{r.nombre || 'Sin nombre'}</span>
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                    <span className="font-bold text-slate-700">
+                      {potreroObj?.nombre || (r.potrero_numero ? formatPotreroNum(r.potrero_numero) : 'Sin potrero asignado')}
+                    </span>
+                    {haRaw > 0 && <span className="text-slate-400 font-semibold">· {haRaw} ha</span>}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={savingRodeoDrawer}
+                  onClick={() => setEditingRodeoDrawer(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer disabled:opacity-50"
+                  title="Cerrar sin guardar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Cuerpo con Scroll */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+                {/* Fila 1: Potrero y Rol Protocolar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                      Potrero / Ubicación
+                    </label>
+                    <select
+                      value={r.potrero_numero ?? ''}
+                      onChange={(e) => updateDrawerField('potrero_numero', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      <option value="">Sin potrero asignado</option>
+                      {potreros.map((p) => {
+                        const cleanLabel = p.nombre || formatPotreroNum(p.numero);
+                        const ha = p.hectareas ? ` (${p.hectareas} ha)` : '';
+                        return (
+                          <option key={p.numero} value={p.numero}>
+                            {cleanLabel}{ha}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                      Rol Protocolar
+                    </label>
+                    <select
+                      value={r.rol_protocolo || inferirRolProtocolo(r)}
+                      onChange={(e) => updateDrawerField('rol_protocolo', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    >
+                      {ROLES_PROTOCOLO.map((rol) => (
+                        <option key={rol} value={rol}>
+                          {rol}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Fila 2: Categorías de Ganado (Grilla 2 Columnas) */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    Conteo de Cabezas por Categoría
+                  </h3>
+
+                  {/* Vacas */}
+                  <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="block text-xs font-black text-slate-900">Vacas (Vientres)</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Madres del rodeo</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 w-44">
+                      <button
+                        type="button"
+                        onClick={() => handleStepDrawer('vacas', -1)}
+                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 flex items-center justify-center cursor-pointer transition active:scale-95 text-base"
+                      >
+                        -
+                      </button>
+                      <NumericInput
+                        value={r.vacas ?? 0}
+                        allowDecimals={false}
+                        onChange={(val) => updateDrawerField('vacas', val)}
+                        className="w-full h-9 text-center font-bold text-sm text-slate-900 bg-white border border-slate-300 rounded-lg focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleStepDrawer('vacas', 1)}
+                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 flex items-center justify-center cursor-pointer transition active:scale-95 text-base"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Terneros Sexados (M y H) */}
+                  <div className="bg-emerald-50/40 p-3.5 rounded-xl border border-emerald-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-black text-emerald-950">Terneros al Pie</span>
+                        <div className="text-[10px] text-emerald-800 font-semibold mt-0.5">
+                          Total: <strong className="text-emerald-950 text-xs">{cantTerneros} cab.</strong>
+                          {pctAlPie != null && (
+                            <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-emerald-100 border border-emerald-300 font-extrabold text-[9px]">
+                              {pctAlPie}% al pie
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Terneros Machos */}
+                      <div className="bg-white p-2.5 rounded-lg border border-sky-200 flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-sky-900">Machos (M)</span>
+                        <div className="flex items-center gap-1 w-28">
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('terneros_machos', -1)}
+                            className="w-7 h-7 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            -
+                          </button>
+                          <NumericInput
+                            value={r.terneros_machos ?? 0}
+                            allowDecimals={false}
+                            onChange={(val) => updateDrawerField('terneros_machos', val)}
+                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-sky-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('terneros_machos', 1)}
+                            className="w-7 h-7 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Terneros Hembras */}
+                      <div className="bg-white p-2.5 rounded-lg border border-rose-200 flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-rose-900">Hembras (H)</span>
+                        <div className="flex items-center gap-1 w-28">
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('terneros_hembras', -1)}
+                            className="w-7 h-7 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            -
+                          </button>
+                          <NumericInput
+                            value={r.terneros_hembras ?? 0}
+                            allowDecimals={false}
+                            onChange={(val) => updateDrawerField('terneros_hembras', val)}
+                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-rose-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('terneros_hembras', 1)}
+                            className="w-7 h-7 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toros (Padres y Toritos) */}
+                  <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-black text-slate-900">Toros y Reproductores</span>
+                        <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                          Total: <strong className="text-slate-900 text-xs">{totalToros} cab.</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Toros Padres */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-800">Toros Padres</span>
+                        <div className="flex items-center gap-1 w-28">
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('toros_padres', -1)}
+                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            -
+                          </button>
+                          <NumericInput
+                            value={r.toros_padres ?? 0}
+                            allowDecimals={false}
+                            onChange={(val) => updateDrawerField('toros_padres', val)}
+                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('toros_padres', 1)}
+                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Toritos */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-800">Toritos</span>
+                        <div className="flex items-center gap-1 w-28">
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('toritos', -1)}
+                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            -
+                          </button>
+                          <NumericInput
+                            value={r.toritos ?? 0}
+                            allowDecimals={false}
+                            onChange={(val) => updateDrawerField('toritos', val)}
+                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleStepDrawer('toritos', 1)}
+                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lote de Toros / Observación opcional */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Identificación / Lote de Toros (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Lote 4 Padres Angus..."
+                        value={r.toro_lote_asignado ?? ''}
+                        onChange={(e) => updateDrawerField('toro_lote_asignado', e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-800 focus:border-slate-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vaquillonas y CUT */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Vaquillonas Reposición */}
+                    <div className="bg-purple-50/40 p-3 rounded-xl border border-purple-100 flex items-center justify-between gap-2">
+                      <div>
+                        <span className="block text-xs font-bold text-purple-950">Vaq. Rep.</span>
+                        <span className="text-[10px] text-purple-700 font-medium">Recría interna</span>
+                      </div>
+                      <div className="flex items-center gap-1 w-28">
+                        <button
+                          type="button"
+                          onClick={() => handleStepDrawer('vaquillonas_reposicion', -1)}
+                          className="w-7 h-7 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm"
+                        >
+                          -
+                        </button>
+                        <NumericInput
+                          value={r.vaquillonas_reposicion ?? 0}
+                          allowDecimals={false}
+                          onChange={(val) => updateDrawerField('vaquillonas_reposicion', val)}
+                          className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-purple-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleStepDrawer('vaquillonas_reposicion', 1)}
+                          className="w-7 h-7 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Vacas CUT / Descarte */}
+                    <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100 flex items-center justify-between gap-2">
+                      <div>
+                        <span className="block text-xs font-bold text-amber-950">Vacas CUT</span>
+                        <span className="text-[10px] text-amber-700 font-medium">Cría último tercio</span>
+                      </div>
+                      <div className="flex items-center gap-1 w-28">
+                        <button
+                          type="button"
+                          onClick={() => handleStepDrawer('vacas_cut', -1)}
+                          className="w-7 h-7 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm"
+                        >
+                          -
+                        </button>
+                        <NumericInput
+                          value={r.vacas_cut ?? 0}
+                          allowDecimals={false}
+                          onChange={(val) => updateDrawerField('vacas_cut', val)}
+                          className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-amber-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleStepDrawer('vacas_cut', 1)}
+                          className="w-7 h-7 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Condición Corporal & Días Meta de Pastoreo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-200">
+                    <div>
+                      <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                        Condición Corporal (1 a 5)
+                      </label>
+                      <div className="pt-1">
+                        <CondicionCorporalStars
+                          value={r.condicion_corporal ?? 3.0}
+                          onChange={(val) => updateDrawerField('condicion_corporal', val)}
+                          size="md"
+                          showScore={true}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                        Meta Días de Pastoreo
+                      </label>
+                      <div className="flex items-center gap-1.5 w-32 pt-1">
+                        <NumericInput
+                          value={r.dias_estimados_pastoreo ?? 30}
+                          allowDecimals={false}
+                          onChange={(val) => updateDrawerField('dias_estimados_pastoreo', val)}
+                          className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded-lg focus:border-emerald-600"
+                        />
+                        <span className="text-xs font-bold text-slate-500">días</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel Resumen de Carga en Vivo (Field Daylight UI) */}
+                <div className="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                      Resumen de Carga en Vivo
+                    </span>
+                    {cargaInstantanea && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-extrabold text-xs shadow-2xs">
+                        {cargaInstantanea} cab/ha
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="block text-[10px] font-extrabold text-slate-500 uppercase">Total Cabezas</span>
+                      <span className="text-lg font-black text-slate-900 tabular-nums">{totalCabezas}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="block text-[10px] font-extrabold text-slate-500 uppercase">Superficie</span>
+                      <span className="text-lg font-black text-slate-900 tabular-nums">
+                        {haRaw > 0 ? `${haRaw} ha` : '—'}
+                      </span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="block text-[10px] font-extrabold text-slate-500 uppercase">Carga</span>
+                      <span className="text-lg font-black text-emerald-900 tabular-nums">
+                        {cargaInstantanea ? `${cargaInstantanea}` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 font-medium pt-1 text-center">
+                    Desglose: {cantVacas} Vacas · {cantTerneros} Terneros · {totalToros} Toros · {cantVaq} Vaq. · {cantCut} CUT
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Fijo */}
+              <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  disabled={savingRodeoDrawer}
+                  onClick={() => setEditingRodeoDrawer(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={savingRodeoDrawer}
+                  onClick={handleSaveRodeoDrawer}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm flex items-center gap-2 shadow-sm transition cursor-pointer disabled:opacity-50"
+                >
+                  {savingRodeoDrawer ? (
+                    <span>Guardando...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>✓ Guardar Cambios</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
