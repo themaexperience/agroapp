@@ -6,9 +6,11 @@ scratch/
 
 # Environment variables & secrets
 .env
+.env*
 .env.local
 .env.*.local
 *.env
+test_*.mjs
 
 # Operating system files
 .DS_Store
