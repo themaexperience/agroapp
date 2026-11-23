@@ -649,15 +649,14 @@ export default function SiembrasView({
   function handleEditSiembra(siembra) {
     const pObj = getPotrero(siembra.potrero_numero);
     const ha = Number(siembra.ha_sembradas || siembra.hectareas) || Number(pObj?.hectareas) || 40;
-    const rawInsumos = Array.isArray(siembra.insumos_json) ? [...siembra.insumos_json] : [];
-    const normalizedInsumos = rawInsumos.map((i) => normalizarInsumoRow(i, ha));
+    const unifiedInsumos = unificarInsumosDeSiembra(siembra.insumos_json, siembra.receta_json, ha);
     setCurrentSiembra({
       ...siembra,
       hectareas: ha,
       ha_sembradas: ha,
       vigencia: siembra.vigencia || 'Activa',
-      receta_json: Array.isArray(siembra.receta_json) ? [...siembra.receta_json] : [],
-      insumos_json: normalizedInsumos,
+      receta_json: unifiedInsumos,
+      insumos_json: unifiedInsumos,
       labores_json: Array.isArray(siembra.labores_json) ? [...siembra.labores_json] : [],
     });
     setModalEditOpen(true);
@@ -2121,18 +2120,29 @@ export default function SiembrasView({
               ['pasada / histórica', 'pasada', 'historica', 'historico', 'archivada', 'archivado'].includes(String(siembra.vigencia || '').toLowerCase().trim());
             const isActiva = !isArchivada;
 
-            const receta = deduplicarReceta(Array.isArray(siembra.receta_json) ? siembra.receta_json : []);
-            const insumos = Array.isArray(siembra.insumos_json) ? siembra.insumos_json : [];
+            const insumosUnificados = unificarInsumosDeSiembra(siembra.insumos_json, siembra.receta_json, ha);
             const labores = Array.isArray(siembra.labores_json) ? siembra.labores_json : [];
 
             // Suma real y exacta de subtotales de cada fila calculada en vivo
-            // Priorizar insumos reales y evitar duplicar productos de la receta técnica
-            const itemsInsumosUnificados = insumos.length > 0 ? insumos : receta;
-            const sumInsumosRows = itemsInsumosUnificados.reduce((acc, it) => acc + (calcularRenglonInsumo(it, ha, dolarRef).subtotalUsd || 0), 0);
+            let semUsd = 0;
+            let agroUsd = 0;
+
+            insumosUnificados.forEach((it) => {
+              const calc = calcularRenglonInsumo(it, ha, dolarRef);
+              if (calc.subtotalUsd <= 0) return;
+              const pLower = (it.producto || '').toLowerCase();
+              const fLower = (it.funcion || '').toLowerCase();
+              const tLower = (it.tipo || '').toLowerCase();
+              const isSem = tLower === 'semilla' || fLower.includes('semilla') || pLower.includes('semilla');
+              if (isSem) semUsd += calc.subtotalUsd;
+              else agroUsd += calc.subtotalUsd;
+            });
+
+            const sumInsumosRows = semUsd + agroUsd;
             const sumLaboresRows = labores.reduce((acc, it) => acc + (calcularRenglonLabor(it, ha, dolarRef).subtotalUsd || 0), 0);
 
-            const cInsumos = sumInsumosRows > 0 ? Math.round(sumInsumosRows * 100) / 100 : (Number(siembra.costo_insumos_usd) || 0);
-            const cLabores = sumLaboresRows > 0 ? Math.round(sumLaboresRows * 100) / 100 : (Number(siembra.costo_labores_usd) || 0);
+            const cInsumos = Math.round(sumInsumosRows * 100) / 100;
+            const cLabores = Math.round(sumLaboresRows * 100) / 100;
             const cTotal = Math.round((cInsumos + cLabores) * 100) / 100;
             const usdPorHa = ha > 0 ? cTotal / ha : 0;
             const insPorHa = ha > 0 ? cInsumos / ha : 0;
@@ -2295,111 +2305,22 @@ export default function SiembrasView({
                     </div>
                   </div>
 
-                  {/* SECCIÓN 2: Receta Agronómica (Ingeniero) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                    <div
-                      onClick={() => toggleSection(siembra.id, 'receta')}
-                      className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between cursor-pointer select-none"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Droplets className="w-4 h-4 text-emerald-800" />
-                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          Receta Agronómica (Ingeniero)
-                        </span>
-                        <span className="text-[11px] px-2 py-0.2 rounded-full bg-slate-200 text-slate-800 font-bold">
-                          {receta.length} {receta.length === 1 ? 'producto' : 'productos'}
-                        </span>
-                      </div>
-                      <div className="text-slate-600">
-                        {isSectionOpen(siembra.id, 'receta') ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </div>
-                    </div>
-
-                    {isSectionOpen(siembra.id, 'receta') && (
-                      <div className="p-3.5">
-                        {receta.length === 0 ? (
-                          <div className="py-4 text-center text-xs text-slate-600 italic">
-                            Sin receta agronómica cargada para este lote.{' '}
-                            <button
-                              type="button"
-                              onClick={() => handleEditSiembra(siembra)}
-                              className="text-emerald-800 underline font-semibold cursor-pointer ml-1"
-                            >
-                              + Agregar receta
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                              <thead>
-                                <tr className="border-b border-slate-200 text-[11px] font-semibold text-slate-600">
-                                  <th className="pb-2">Producto Prescripto</th>
-                                  <th className="pb-2">Función / Tipo</th>
-                                  <th className="pb-2 text-right">Dosis / ha</th>
-                                  <th className="pb-2">Unidad</th>
-                                  <th className="pb-2 text-right">Total Lote ({ha.toFixed(1)} ha)</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {receta.map((r, idx) => {
-                                  const dosis = Number(r.dosis_ha) || 0;
-                                  const totalCalc = dosis * ha;
-                                  return (
-                                    <tr key={idx} className="hover:bg-slate-50 transition">
-                                      <td className="py-2.5 font-bold text-slate-900">{r.producto}</td>
-                                      <td className="py-2.5 text-slate-700 font-medium">{r.funcion || 'Agroquímico / Insumo'}</td>
-                                      <td className="py-2.5 text-right font-mono text-emerald-900 font-bold">
-                                        {dosis.toLocaleString('es-AR')}
-                                      </td>
-                                      <td className="py-2.5 text-slate-700 font-medium">{r.unidad || 'L'}</td>
-                                      <td className="py-2.5 text-right font-mono font-bold text-slate-900">
-                                        {totalCalc.toLocaleString('es-AR', { maximumFractionDigits: 1 })}{' '}
-                                        <span className="text-[10px] text-slate-600 font-medium">{r.unidad || 'L'}</span>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* SECCIÓN 3: Insumos y Remitos Aplicados */}
+                  {/* SECCIÓN 2: Insumos del Lote (Semillas, Fertilizantes y Químicos) */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
                     <div
                       onClick={() => toggleSection(siembra.id, 'insumos')}
                       className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between cursor-pointer select-none"
                     >
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Receipt className="w-4 h-4 text-emerald-800" />
+                        <Droplets className="w-4 h-4 text-emerald-800" />
                         <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          Insumos y Remitos Aplicados
+                          Insumos del Lote (Semillas, Fertilizantes y Químicos)
                         </span>
                         <span className="text-[11px] px-2 py-0.2 rounded-full bg-slate-200 text-slate-800 font-bold">
                           {effectiveIsAdmin
-                            ? `${insumos.length} aplicaciones · USD $${Math.round(cInsumos).toLocaleString('es-AR')}`
-                            : `${insumos.length} ${insumos.length === 1 ? 'aplicación registrada' : 'aplicaciones registradas'}`}
+                            ? `${insumosUnificados.length} insumos · USD $${Math.round(cInsumos).toLocaleString('es-AR')}`
+                            : `${insumosUnificados.length} ${insumosUnificados.length === 1 ? 'insumo registrado' : 'insumos registrados'}`}
                         </span>
-                        {insumos.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCleanSiembraInsumos(siembra);
-                            }}
-                            className="ml-1 sm:ml-2 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 transition shadow-2xs cursor-pointer"
-                            title="Eliminar automáticamente duplicados, ítems de sobrante y semillas incompatibles"
-                          >
-                            <span>🧹 Limpiar duplicados / sobrantes</span>
-                          </button>
-                        )}
                       </div>
                       <div className="text-slate-600">
                         {isSectionOpen(siembra.id, 'insumos') ? (
@@ -2412,15 +2333,15 @@ export default function SiembrasView({
 
                     {isSectionOpen(siembra.id, 'insumos') && (
                       <div className="p-3.5">
-                        {insumos.length === 0 ? (
+                        {insumosUnificados.length === 0 ? (
                           <div className="py-4 text-center text-xs text-slate-600 italic">
-                            Sin remitos ni insumos aplicados registrados aún.{' '}
+                            Sin insumos registrados aún para este lote.{' '}
                             <button
                               type="button"
                               onClick={() => handleEditSiembra(siembra)}
                               className="text-emerald-800 underline font-semibold cursor-pointer ml-1"
                             >
-                              + Cargar remito / aplicación
+                              + Cargar insumos
                             </button>
                           </div>
                         ) : (
@@ -2428,63 +2349,71 @@ export default function SiembrasView({
                             <table className="w-full text-left text-xs">
                               <thead>
                                 <tr className="border-b border-slate-200 text-[11px] font-semibold text-slate-600">
-                                  <th className="pb-2">Fecha</th>
-                                  <th className="pb-2">N° Remito / Proveedor</th>
-                                  <th className="pb-2">Producto</th>
-                                  <th className="pb-2 text-right">Cantidad Total</th>
+                                  <th className="pb-2">Tipo & Insumo</th>
+                                  <th className="pb-2">Presentación / Envase</th>
                                   <th className="pb-2 text-right">Dosis Real/ha</th>
+                                  <th className="pb-2 text-right">Cantidad Total ({ha.toFixed(1)} ha)</th>
+                                  {effectiveIsAdmin && <th className="pb-2 text-right">Precio Unitario</th>}
                                   {effectiveIsAdmin && <th className="pb-2 text-right">Subtotal</th>}
-                                  <th className="pb-2 text-center w-10">Acción</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {insumos.map((ins, idx) => {
-                                  const cant = Math.round((Number(ins.cantidad) || 0) * 100) / 100;
-                                  const dosisReal = Math.round((Number(ins.dosis_real) || (ha > 0 ? cant / ha : 0)) * 100) / 100;
-                                  const costoUsd = Math.round((Number(ins.costo_usd) || 0) * 100) / 100;
-                                  const costoArs = ins.costo_ars ? Math.round(Number(ins.costo_ars) * 100) / 100 : Math.round(costoUsd * (Number(dolarRef) || 1665) * 100) / 100;
-
+                                {insumosUnificados.map((ins, idx) => {
+                                  const calc = calcularRenglonInsumo(ins, ha, dolarRef);
                                   return (
                                     <tr key={idx} className="hover:bg-slate-50 transition">
-                                      <td className="py-2.5 text-slate-700 font-medium whitespace-nowrap">{formatFechaAR(ins.fecha)}</td>
                                       <td className="py-2.5">
-                                        <div className="font-bold text-slate-900">{ins.remito || 'S/N'}</div>
-                                        <div className="text-[11px] text-slate-600 font-medium">{ins.proveedor || '-'}</div>
+                                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                                            {ins.tipo || 'Insumo'}
+                                          </span>
+                                          <span>{ins.producto}</span>
+                                        </div>
+                                        {(ins.proveedor || ins.remito) && (
+                                          <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                            {ins.proveedor ? `${ins.proveedor} ` : ''}
+                                            {ins.remito ? `· Remito: ${ins.remito}` : ''}
+                                          </div>
+                                        )}
                                       </td>
-                                      <td className="py-2.5 font-bold text-emerald-900">{ins.producto}</td>
+                                      <td className="py-2.5 text-slate-700 font-medium">
+                                        {calc.pres.label}
+                                      </td>
+                                      <td className="py-2.5 text-right font-mono font-bold text-emerald-900">
+                                        {calc.dosisReal > 0 ? calc.dosisReal.toFixed(2) : '-'} {calc.pres.unidadBase}/ha
+                                      </td>
                                       <td className="py-2.5 text-right font-mono font-bold text-slate-900">
-                                        {cant.toLocaleString('es-AR')}{' '}
-                                        <span className="text-[10px] text-slate-600 font-medium">{ins.unidad || 'L'}</span>
-                                      </td>
-                                      <td className="py-2.5 text-right font-mono text-slate-700 font-medium">
-                                        {dosisReal.toFixed(2)}{' '}
-                                        <span className="text-[10px] text-slate-600">{ins.unidad || 'L'}/ha</span>
+                                        {calc.totalBase.toLocaleString('es-AR')}{' '}
+                                        <span className="text-[10px] text-slate-600 font-medium">{calc.pres.unidadBase}</span>
+                                        {calc.hasEnvase && (
+                                          <div className="text-[10px] text-teal-700 font-medium">
+                                            📦 {calc.cantEnvases} {calc.pres.envase}
+                                          </div>
+                                        )}
                                       </td>
                                       {effectiveIsAdmin && (
+                                        <td className="py-2.5 text-right font-mono text-slate-700 font-medium">
+                                          {calc.precioUnitario > 0
+                                            ? `${calc.moneda} $${calc.precioUnitario.toLocaleString('es-AR')} / ${calc.unidadPrecio}`
+                                            : '-'}
+                                        </td>
+                                      )}
+                                      {effectiveIsAdmin && (
                                         <td className="py-2.5 text-right font-mono font-bold text-slate-900">
-                                          {ins.moneda === 'ARS' ? (
+                                          {calc.subtotalUsd > 0 ? (
                                             <div>
-                                              <div className="text-emerald-900 font-black">ARS ${Math.round(costoArs).toLocaleString('es-AR')}</div>
-                                              <div className="text-[10px] text-slate-500 font-normal">≈ USD ${costoUsd.toLocaleString('es-AR')}</div>
+                                              <div className="text-emerald-900 font-black">
+                                                USD ${Math.round(calc.subtotalUsd).toLocaleString('es-AR')}
+                                              </div>
+                                              <div className="text-[10px] text-slate-500 font-normal">
+                                                ≈ ARS ${Math.round(calc.subtotalArs).toLocaleString('es-AR')}
+                                              </div>
                                             </div>
                                           ) : (
-                                            <div>
-                                              <div className="text-slate-900 font-black">USD ${costoUsd.toLocaleString('es-AR')}</div>
-                                              <div className="text-[10px] text-slate-500 font-normal">≈ ARS ${Math.round(costoArs).toLocaleString('es-AR')}</div>
-                                            </div>
+                                            <span className="text-slate-400 font-normal">$0,00</span>
                                           )}
                                         </td>
                                       )}
-                                      <td className="py-2.5 text-center">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteInsumoFromSiembra(siembra, idx)}
-                                          className="p-1 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200 transition cursor-pointer"
-                                          title={`Eliminar ${ins.producto} de esta siembra`}
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -2496,7 +2425,7 @@ export default function SiembrasView({
                     )}
                   </div>
 
-                  {/* SECCIÓN 4: Labores Realizadas */}
+                  {/* SECCIÓN 3: Labores Realizadas */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
                     <div
                       onClick={() => toggleSection(siembra.id, 'labores')}
@@ -2648,11 +2577,11 @@ export default function SiembrasView({
                       <div className="h-6 w-px bg-slate-800 hidden sm:block" />
 
                       <div>
-                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">Receta & Insumos</span>
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block">Insumos del Lote</span>
                         <span className="font-bold text-emerald-400 font-mono">
-                          {insumos.length} aplicaciones
+                          {insumosUnificados.length} {insumosUnificados.length === 1 ? 'insumo' : 'insumos'}
                         </span>
-                        <span className="text-[10px] text-slate-400 ml-1">({receta.length} prescriptos)</span>
+                        <span className="text-[10px] text-slate-400 ml-1">semillas y químicos</span>
                       </div>
 
                       <div className="h-6 w-px bg-slate-800 hidden sm:block" />
@@ -2941,6 +2870,99 @@ export function normalizarInsumoRow(item, totHa = 1) {
   return item;
 }
 
+// Función universal que unifica receta_json e insumos_json en una sola lista limpia sin duplicados ni pérdidas
+export function unificarInsumosDeSiembra(rawInsumos = [], rawReceta = [], totHa = 1) {
+  const listInsumos = Array.isArray(rawInsumos) ? rawInsumos : [];
+  const listReceta = Array.isArray(rawReceta) ? rawReceta : [];
+  const ha = Number(totHa) > 0 ? Number(totHa) : 1;
+
+  const result = [];
+  const seenNames = new Set();
+
+  function inferTipo(prod = '', func = '') {
+    const p = (prod || '').toLowerCase();
+    const f = (func || '').toLowerCase();
+    if (f.includes('semilla') || p.includes('semilla') || p.includes('raigrás') || p.includes('raigras') ||
+        p.includes('festuca') || p.includes('avena') || p.includes('trébol') || p.includes('trebol') ||
+        p.includes('lotus') || p.includes('sorgo') || p.includes('maíz') || p.includes('maiz') ||
+        p.includes('alfalfa') || p.includes('agropiro') || p.includes('moha') || p.includes('vicia') ||
+        p.includes('cebada') || p.includes('trigo') || p.includes('centeno') || p.includes('pasto')) {
+      return 'Semilla';
+    }
+    if (f.includes('fertiliz') || p.includes('urea') || p.includes('fosfato') || p.includes('map') ||
+        p.includes('dap') || p.includes('sps') || p.includes('sulfato') || p.includes('fertiliz') ||
+        p.includes('abono') || p.includes('yeso')) {
+      return 'Fertilizante';
+    }
+    return 'Agroquímico';
+  }
+
+  // 1. Agregar insumos reales
+  listInsumos.forEach((item) => {
+    if (!item) return;
+    const prod = (item.producto || '').trim();
+    if (prod) seenNames.add(prod.toLowerCase());
+
+    const norm = normalizarInsumoRow(item, ha);
+    const pres = findPresentacion(norm.presentacion || norm.unidad);
+    const tipo = norm.tipo || inferTipo(norm.producto, norm.funcion);
+
+    result.push({
+      id: norm.id || Math.random().toString(36).slice(2, 9),
+      tipo,
+      producto: norm.producto || '',
+      proveedor: norm.proveedor || '',
+      remito: norm.remito || '',
+      presentacion: pres.id,
+      modo_calculo: norm.modo_calculo || (norm.dosis_ha && !norm.cantidad ? 'dosis' : 'total'),
+      dosis_ha: norm.dosis_ha !== undefined ? norm.dosis_ha : '',
+      cantidad: norm.cantidad !== undefined ? norm.cantidad : '',
+      moneda: norm.moneda === 'ARS' ? 'ARS' : 'USD',
+      precio_unitario: norm.precio_unitario !== undefined ? norm.precio_unitario : '',
+      fecha: norm.fecha || '',
+      unidad: pres.unidadBase,
+      costo_usd: norm.costo_usd || 0,
+      costo_ars: norm.costo_ars || 0,
+    });
+  });
+
+  // 2. Si hay productos en la receta que no están en insumos, agregarlos sin perderlos
+  listReceta.forEach((item) => {
+    if (!item) return;
+    const prod = (item.producto || '').trim();
+    if (prod && seenNames.has(prod.toLowerCase())) return; // Ya está cargado en insumos
+    if (prod) seenNames.add(prod.toLowerCase());
+
+    const pres = findPresentacion(item.presentacion || item.unidad);
+    const tipo = item.tipo || inferTipo(item.producto, item.funcion);
+    const hasEnvase = !!(pres.envase && pres.factor > 1);
+
+    const dosis = Number(String(item.dosis_ha || '').replace(',', '.')) || 0;
+    const totalBase = dosis * ha;
+    const cantEnv = hasEnvase && pres.factor > 0 ? Math.ceil(totalBase / pres.factor) : totalBase;
+
+    result.push({
+      id: item.id || Math.random().toString(36).slice(2, 9),
+      tipo,
+      producto: item.producto || '',
+      proveedor: item.proveedor || '',
+      remito: item.remito || '',
+      presentacion: pres.id,
+      modo_calculo: 'dosis',
+      dosis_ha: item.dosis_ha !== undefined && item.dosis_ha !== '' ? item.dosis_ha : (dosis > 0 ? dosis : ''),
+      cantidad: hasEnvase ? cantEnv : totalBase,
+      moneda: item.moneda === 'ARS' ? 'ARS' : 'USD',
+      precio_unitario: item.precio_unitario !== undefined ? item.precio_unitario : '',
+      fecha: item.fecha || '',
+      unidad: pres.unidadBase,
+      costo_usd: item.costo_usd || 0,
+      costo_ars: item.costo_ars || 0,
+    });
+  });
+
+  return result;
+}
+
 export function findPresentacion(pIdOrUnidad) {
   if (!pIdOrUnidad) return PRESENTACIONES_INSUMOS[0];
   const byId = PRESENTACIONES_INSUMOS.find((p) => p.id === pIdOrUnidad);
@@ -3175,6 +3197,10 @@ function SiembraEditModal({
     ];
   });
 
+  const initInsumosUnificados = useMemo(() => {
+    return unificarInsumosDeSiembra(siembra.insumos_json, siembra.receta_json, initHa);
+  }, [siembra.insumos_json, siembra.receta_json, initHa]);
+
   const [form, setForm] = useState({
     id: siembra.id,
     potrero_numero: siembra.potrero_numero || potreros[0]?.numero || 1,
@@ -3187,10 +3213,8 @@ function SiembraEditModal({
     estado: siembra.estado || 'Sembrado',
     fecha: siembra.fecha || new Date().toISOString().slice(0, 10),
     observaciones: siembra.observaciones || '',
-    receta_json: Array.isArray(siembra.receta_json) ? [...siembra.receta_json] : [],
-    insumos_json: Array.isArray(siembra.insumos_json)
-      ? siembra.insumos_json.map((i) => normalizarInsumoRow(i, initHa))
-      : [],
+    receta_json: initInsumosUnificados,
+    insumos_json: initInsumosUnificados,
     labores_json: Array.isArray(siembra.labores_json) ? [...siembra.labores_json] : [],
   });
 
@@ -3313,120 +3337,39 @@ function SiembraEditModal({
     }));
   }
 
-  // Helpers para Receta
-  function addRecetaRow() {
-    setForm((prev) => ({
-      ...prev,
-      receta_json: [
-        ...prev.receta_json,
-        {
-          producto: '',
-          funcion: 'Herbicida',
-          dosis_ha: 1,
-          presentacion: 'litro_directo',
-          unidad: 'L',
-          precio_unitario: 0,
-          moneda: 'USD',
-        },
-      ],
-    }));
-  }
+  // Helpers para la Tabla Única de Insumos
+  function addInsumoRow(defaultTipo = 'Agroquímico') {
+    const isSem = defaultTipo === 'Semilla';
+    const isFert = defaultTipo === 'Fertilizante';
+    const defaultPres = isSem ? 'bolsa_25' : isFert ? 'bolsa_50' : 'litro_directo';
+    const presObj = findPresentacion(defaultPres);
 
-  function updateRecetaRow(idx, field, value) {
     setForm((prev) => {
-      const next = [...prev.receta_json];
-      let cleanVal = value;
-      if ((field === 'precio_unitario' || field === 'dosis_ha') && typeof cleanVal === 'string') {
-        cleanVal = cleanVal.replace(',', '.');
-      }
-      next[idx] = { ...next[idx], [field]: cleanVal };
-      if (field === 'presentacion') {
-        const pres = findPresentacion(cleanVal);
-        next[idx].unidad = pres.unidadBase;
-      }
-      return { ...prev, receta_json: next };
+      const nuevoItem = {
+        id: Math.random().toString(36).slice(2, 9),
+        tipo: defaultTipo,
+        producto: '',
+        proveedor: '',
+        remito: '',
+        presentacion: presObj.id,
+        modo_calculo: 'dosis',
+        dosis_ha: isSem ? 20 : isFert ? 80 : 1,
+        cantidad: '',
+        unidad: presObj.unidadBase,
+        dosis_real: isSem ? 20 : isFert ? 80 : 1,
+        precio_unitario: '',
+        moneda: 'USD',
+        fecha: prev.fecha || new Date().toISOString().slice(0, 10),
+        costo_usd: 0,
+        costo_ars: 0,
+      };
+      const updated = [...prev.insumos_json, nuevoItem];
+      return {
+        ...prev,
+        insumos_json: updated,
+        receta_json: updated,
+      };
     });
-  }
-
-  function removeRecetaRow(idx) {
-    setForm((prev) => ({
-      ...prev,
-      receta_json: prev.receta_json.filter((_, i) => i !== idx),
-    }));
-  }
-
-  // Volcar renglón de prescripción a Insumos Reales con 1 clic
-  function handleVolcarRecetaAInsumos(idx) {
-    const r = form.receta_json[idx];
-    if (!r) return;
-    const calc = calcularRenglonInsumo(r, totHaActual, dolarRef);
-    const pres = calc.pres;
-    const hasEnv = !!(pres.envase && pres.factor > 1);
-    const cantFinal = hasEnv
-      ? (calc.envasesSugeridos > 0 ? calc.envasesSugeridos : (pres.factor > 1 ? Math.ceil(calc.totalExacto / pres.factor) : calc.totalExacto))
-      : calc.totalExacto;
-
-    const totalKg = hasEnv ? cantFinal * pres.factor : cantFinal;
-    const dosisReal = totHaActual > 0 ? Math.round((totalKg / totHaActual) * 100) / 100 : (Number(String(r.dosis_ha || '').replace(',', '.')) || 1);
-    const pu = Number(String(r.precio_unitario || '').replace(',', '.')) || 0;
-    const subUsd = Math.round(calc.subtotalUsd * 100) / 100;
-    const subArs = Math.round(calc.subtotalArs * 100) / 100;
-
-    const nuevoInsumo = {
-      fecha: form.fecha || new Date().toISOString().slice(0, 10),
-      remito: '',
-      proveedor: 'Cooperativa / Semillero',
-      producto: r.producto || 'Insumo prescripto',
-      presentacion: pres.id,
-      modo_calculo: hasEnv ? 'total' : 'dosis',
-      cantidad: cantFinal,
-      dosis_ha: Number(String(r.dosis_ha || '').replace(',', '.')) || dosisReal,
-      unidad: pres.unidadBase,
-      dosis_real: dosisReal,
-      precio_unitario: pu,
-      moneda: r.moneda || 'USD',
-      costo_usd: subUsd,
-      costo_ars: subArs,
-      funcion: r.funcion || (hasEnv && pres.tipo === 'kg' ? 'Semilla' : 'Agroquímico'),
-    };
-
-    setForm((prev) => ({
-      ...prev,
-      insumos_json: [...prev.insumos_json, nuevoInsumo],
-    }));
-
-    if (notify) {
-      notify(
-        `"${r.producto || 'Insumo'}" volcado a Insumos Reales (${cantFinal} ${hasEnv ? pres.envase : pres.unidadBase} · Subtotal USD $${Math.round(subUsd).toLocaleString('es-AR')}).`,
-        'success'
-      );
-    }
-  }
-
-  // Helpers para Insumos
-  function addInsumoRow() {
-    setForm((prev) => ({
-      ...prev,
-      insumos_json: [
-        ...prev.insumos_json,
-        {
-          fecha: prev.fecha || new Date().toISOString().slice(0, 10),
-          remito: '',
-          proveedor: '',
-          producto: '',
-          presentacion: 'bolsa_25',
-          modo_calculo: 'total',
-          cantidad: 10,
-          dosis_ha: totHaActual > 0 ? Number(((10 * 25) / totHaActual).toFixed(2)) : 25,
-          unidad: 'kg',
-          dosis_real: totHaActual > 0 ? Number(((10 * 25) / totHaActual).toFixed(2)) : 25,
-          precio_unitario: 0,
-          moneda: 'USD',
-          costo_usd: 0,
-          costo_ars: 0,
-        },
-      ],
-    }));
   }
 
   function updateInsumoRow(idx, field, value) {
@@ -3437,21 +3380,32 @@ function SiembraEditModal({
         cleanVal = cleanVal.replace(',', '.');
       }
       next[idx] = { ...next[idx], [field]: cleanVal };
+      if (field === 'presentacion') {
+        const pres = findPresentacion(cleanVal);
+        next[idx].unidad = pres.unidadBase;
+      }
       const calc = calcularRenglonInsumo(next[idx], totHaActual, dolarRef);
       next[idx].unidad = calc.pres.unidadBase;
       next[idx].dosis_real = calc.dosisReal;
       next[idx].costo_usd = calc.subtotalUsd;
       next[idx].costo_ars = calc.subtotalArs;
-      next[idx].precio_unitario = cleanVal;
-      return { ...prev, insumos_json: next };
+      return {
+        ...prev,
+        insumos_json: next,
+        receta_json: next,
+      };
     });
   }
 
   function removeInsumoRow(idx) {
-    setForm((prev) => ({
-      ...prev,
-      insumos_json: prev.insumos_json.filter((_, i) => i !== idx),
-    }));
+    setForm((prev) => {
+      const updated = prev.insumos_json.filter((_, i) => i !== idx);
+      return {
+        ...prev,
+        insumos_json: updated,
+        receta_json: updated,
+      };
+    });
   }
 
   // Helpers para Labores
@@ -3517,39 +3471,35 @@ function SiembraEditModal({
     const presId = 'bolsa_' + seedPesoBolsa;
     const presObj = findPresentacion(presId);
 
-    setForm((prev) => ({
-      ...prev,
-      receta_json: [
-        ...prev.receta_json,
-        {
-          producto: prodName + ' (' + seedPesoBolsa + ' kg/bolsa)',
-          funcion: 'Semilla',
-          dosis_ha: Number(calcDensidadKgHa),
-          presentacion: presObj.id,
-          unidad: 'kg',
-          precio_unitario: 0,
-          moneda: 'USD',
-        },
-      ],
-      insumos_json: [
-        ...prev.insumos_json,
-        {
-          fecha: prev.fecha || new Date().toISOString().slice(0, 10),
-          remito: '',
-          proveedor: 'Cooperativa / Semillero',
-          producto: prodName + ' (' + calcTotalBolsas + ' bolsas x ' + seedPesoBolsa + ' kg)',
-          presentacion: presObj.id,
-          cantidad: calcTotalKg,
-          unidad: 'kg',
-          dosis_real: Number(calcDensidadKgHa),
-          precio_unitario: 0,
-          moneda: 'USD',
-          costo_usd: 0,
-        },
-      ],
-    }));
+    const nuevaFilaSemilla = {
+      id: Math.random().toString(36).slice(2, 9),
+      tipo: 'Semilla',
+      producto: prodName + ' (' + seedPesoBolsa + ' kg/bolsa)',
+      proveedor: 'Cooperativa / Semillero',
+      remito: '',
+      presentacion: presObj.id,
+      modo_calculo: seedCalcMode === 'kgha' ? 'dosis' : 'total',
+      dosis_ha: Number(calcDensidadKgHa),
+      cantidad: seedCalcMode === 'kgha' ? calcTotalBolsas : Number(seedBolsas),
+      unidad: 'kg',
+      dosis_real: Number(calcDensidadKgHa),
+      precio_unitario: '',
+      moneda: 'USD',
+      fecha: form.fecha || new Date().toISOString().slice(0, 10),
+      costo_usd: 0,
+      costo_ars: 0,
+    };
+
+    setForm((prev) => {
+      const updated = [...prev.insumos_json, nuevaFilaSemilla];
+      return {
+        ...prev,
+        insumos_json: updated,
+        receta_json: updated,
+      };
+    });
     setShowSeedCalc(false);
-    if (notify) notify('Cálculo de semilla volcado a Receta e Insumos (' + calcTotalKg + ' kg en ' + calcTotalBolsas + ' bolsas).', 'success');
+    if (notify) notify('Semilla agregada a la lista de insumos (' + calcTotalKg + ' kg en ' + calcTotalBolsas + ' bolsas).', 'success');
   }
 
   // Disparar Escaneo con IA para una Sección
@@ -3581,62 +3531,50 @@ function SiembraEditModal({
         ? lote.insumos
         : fallbackInsumos;
 
-      if (scanTargetSection === 'receta' && insumosList.length > 0) {
-        const nuevos = insumosList.map((ins) => {
-          const pres = findPresentacion(ins.unidad || ins.presentacion);
-          return {
-            producto: ins.producto || ins.nombre || '',
-            funcion: ins.dosis_ha && Number(ins.dosis_ha) > 10 ? 'Semilla' : (ins.funcion || 'Prescripción'),
-            dosis_ha: Number(ins.dosis_ha) || (totHaActual > 0 && ins.cantidad_total ? Math.round((Number(ins.cantidad_total) / totHaActual) * 100) / 100 : 1),
-            unidad: pres.unidadBase,
-            presentacion: pres.id,
-            precio_unitario: Number(ins.precio_unitario) || 0,
-            moneda: res?.moneda || ins.moneda || 'USD',
-          };
-        });
-        setForm((prev) => ({
-          ...prev,
-          receta_json: [...prev.receta_json, ...nuevos],
-        }));
-        if (notify) notify('Se importaron ' + nuevos.length + ' productos de prescripción / cotización con Gemini IA.', 'success');
-      } else if (scanTargetSection === 'insumos' && insumosList.length > 0) {
+      if ((scanTargetSection === 'insumos' || scanTargetSection === 'receta') && insumosList.length > 0) {
         const nuevos = insumosList.map((ins) => {
           const pres = findPresentacion(ins.unidad || ins.presentacion);
           const hasEnv = !!(pres.envase && pres.factor > 1);
           let cant = Number(ins.cantidad_total || ins.cantidad || 0);
-          if (hasEnv) {
-            if (cant > 50 && pres.factor > 1) {
-              cant = Math.ceil(cant / pres.factor);
-            }
+          if (hasEnv && cant > 50 && pres.factor > 1) {
+            cant = Math.ceil(cant / pres.factor);
           }
-          if (cant <= 0) cant = 1;
-
-          const costo = (res?.moneda === 'ARS' || ins.moneda === 'ARS')
-            ? (Number(ins.costo_total || ins.subtotal) || 0) / (Number(dolarRef) || 1665)
-            : Number(ins.costo_total || ins.subtotal) || 0;
-
-          const totalKg = hasEnv ? cant * pres.factor : cant;
-          const dosisReal = totHaActual > 0 ? Math.round((totalKg / totHaActual) * 100) / 100 : 1;
+          const dosisHa = Number(ins.dosis_ha) || (totHaActual > 0 && cant > 0 ? (hasEnv ? (cant * pres.factor) / totHaActual : cant / totHaActual) : 1);
+          const pUnit = Number(ins.precio_unitario) || 0;
+          const pLower = (ins.producto || ins.nombre || '').toLowerCase();
+          const fLower = (ins.funcion || '').toLowerCase();
+          const tipo = fLower.includes('semilla') || pLower.includes('semilla') || dosisHa > 15
+            ? 'Semilla'
+            : (fLower.includes('fertiliz') || pLower.includes('urea') || pLower.includes('fosfato') ? 'Fertilizante' : 'Agroquímico');
 
           return {
+            id: Math.random().toString(36).slice(2, 9),
             fecha: lote.fecha_estimada || new Date().toISOString().slice(0, 10),
             remito: res?.remito_o_receta_nro || res?.presupuesto_nro || '',
             proveedor: res?.ingeniero_o_proveedor || res?.cooperativa || '',
+            tipo,
             producto: ins.producto || ins.nombre || '',
             presentacion: pres.id,
-            cantidad: cant,
+            modo_calculo: dosisHa > 0 ? 'dosis' : 'total',
+            dosis_ha: dosisHa > 0 ? Math.round(dosisHa * 100) / 100 : '',
+            cantidad: cant > 0 ? cant : '',
             unidad: pres.unidadBase,
-            dosis_real: dosisReal,
-            precio_unitario: Number(ins.precio_unitario) || 0,
+            dosis_real: dosisHa > 0 ? Math.round(dosisHa * 100) / 100 : 1,
+            precio_unitario: pUnit > 0 ? pUnit : '',
             moneda: res?.moneda || ins.moneda || 'USD',
-            costo_usd: Math.round(costo * 100) / 100,
+            costo_usd: 0,
+            costo_ars: 0,
           };
         });
-        setForm((prev) => ({
-          ...prev,
-          insumos_json: [...prev.insumos_json, ...nuevos],
-        }));
-        if (notify) notify('Se importaron ' + nuevos.length + ' insumos / cotizaciones con Gemini IA.', 'success');
+        setForm((prev) => {
+          const updated = [...prev.insumos_json, ...nuevos];
+          return {
+            ...prev,
+            insumos_json: updated,
+            receta_json: updated,
+          };
+        });
+        if (notify) notify('Se importaron ' + nuevos.length + ' insumos desde el documento con Gemini IA.', 'success');
       } else if (scanTargetSection === 'labores' && Array.isArray(lote.labores_detalle) && lote.labores_detalle.length > 0) {
         const nuevos = lote.labores_detalle.map((lab) => {
           const subUsd = res?.moneda === 'ARS'
@@ -3670,34 +3608,22 @@ function SiembraEditModal({
     }
   }
 
-  // Totales en vivo desglosados (prioriza insumos reales y evita duplicar productos de la receta)
+  // Totales en vivo desglosados (directamente de la lista unificada de insumos)
   const { totalSemillasUsd, totalAgroquimicosUsd, totalInsumosUsd } = useMemo(() => {
     let semUsd = 0;
     let agroUsd = 0;
 
-    // 1. Identificar productos cargados en Insumos Reales (Sección 3)
-    const insumosRealesNorm = new Set(
-      form.insumos_json.map((i) => (i.producto || '').trim().toLowerCase()).filter(Boolean)
-    );
-
-    // 2. Unificar insumos reales + ítems de la receta agronómica que aún no están en insumos reales
-    const sourceList = [
-      ...form.insumos_json,
-      ...form.receta_json.filter((r) => {
-        const prod = (r.producto || '').trim().toLowerCase();
-        return prod && !insumosRealesNorm.has(prod);
-      }),
-    ];
-
-    sourceList.forEach((item) => {
+    form.insumos_json.forEach((item) => {
       const calc = calcularRenglonInsumo(item, totHaActual, dolarRef);
       if (calc.subtotalUsd <= 0) return;
 
       const pLower = (item.producto || '').toLowerCase();
       const fLower = (item.funcion || '').toLowerCase();
+      const tLower = (item.tipo || '').toLowerCase();
       const presId = (item.presentacion || calc.pres?.id || '').toLowerCase();
 
       const isSemilla =
+        tLower === 'semilla' ||
         fLower.includes('semilla') ||
         pLower.includes('semilla') ||
         pLower.includes('raigrás') ||
@@ -3719,7 +3645,6 @@ function SiembraEditModal({
         pLower.includes('centeno') ||
         pLower.includes('pasto') ||
         pLower.includes('consociad') ||
-        item.tipo === 'Semilla' ||
         (presId.includes('bolsa') && !pLower.includes('urea') && !pLower.includes('fosfato') && !pLower.includes('fertiliz'));
 
       if (isSemilla) {
@@ -3734,7 +3659,7 @@ function SiembraEditModal({
       totalAgroquimicosUsd: Math.round(agroUsd * 100) / 100,
       totalInsumosUsd: Math.round((semUsd + agroUsd) * 100) / 100,
     };
-  }, [form.insumos_json, form.receta_json, totHaActual, dolarRef]);
+  }, [form.insumos_json, totHaActual, dolarRef]);
 
   const totalLaboresUsd = useMemo(() => {
     return form.labores_json.reduce((sum, item) => {
@@ -3777,19 +3702,6 @@ function SiembraEditModal({
       };
     });
 
-    const normalizedReceta = form.receta_json.map((item) => {
-      const calc = calcularRenglonInsumo(item, totHaActual, dolarRef);
-      return {
-        ...item,
-        total_lote: calc.totalExacto,
-        envases_sugeridos: calc.envasesSugeridos,
-        total_redondeado: calc.totalRedondeado,
-        costo_usd: Math.round(calc.subtotalUsd * 100) / 100,
-        costo_ars: Math.round(calc.subtotalArs * 100) / 100,
-        precio_unitario: calc.precioUnitario,
-      };
-    });
-
     onSave({
       ...form,
       ha_sembradas: totHaActual,
@@ -3797,7 +3709,7 @@ function SiembraEditModal({
       costo_insumos_usd: totalInsumosUsd,
       costo_labores_usd: totalLaboresUsd,
       costo_total_usd: totalInversionUsd,
-      receta_json: normalizedReceta,
+      receta_json: normalizedInsumos,
       insumos_json: normalizedInsumos,
       labores_json: normalizedLabores,
       is_multipotrero: isMultiPotrero,
@@ -4169,22 +4081,22 @@ function SiembraEditModal({
             </div>
           </div>
 
-          {/* SECCIÓN 2: Receta Agronómica y Calculadora por Fila */}
+          {/* SECCIÓN 2: Insumos del Lote (Semillas, Fertilizantes y Químicos) - TABLA ÚNICA */}
           <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-teal-400" />
-                <span>2. Receta Agronómica (Prescripción Técnica)</span>
+              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>2. Insumos del Lote (Semillas, Fertilizantes y Químicos)</span>
               </h4>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => triggerScanSection('receta')}
+                  onClick={() => triggerScanSection('insumos')}
                   className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                  title="Subir archivo o foto de receta técnica con IA"
+                  title="Subir archivo o foto de receta técnica, remito o cotización con IA"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                  <span>✨ Leer Receta con IA</span>
+                  <span>✨ Cargar desde Receta o Cotización</span>
                 </button>
                 <button
                   type="button"
@@ -4196,11 +4108,11 @@ function SiembraEditModal({
                 </button>
                 <button
                   type="button"
-                  onClick={addRecetaRow}
-                  className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                  onClick={() => addInsumoRow('Agroquímico')}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar Producto</span>
+                  <span>+ Agregar Insumo</span>
                 </button>
               </div>
             </div>
@@ -4304,200 +4216,26 @@ function SiembraEditModal({
                       className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition"
                     >
                       <Plus className="w-4 h-4" />
-                      Aplicar a Receta e Insumos
+                      Agregar Semilla a Insumos
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TABLA DE RECETA CON CALCULADORA POR FILA */}
-            {form.receta_json.length === 0 ? (
-              <p className="text-slate-500 italic text-center py-3">
-                No hay productos prescriptos cargados. Usá "+ Agregar Producto" o "✨ Leer Receta con IA".
-              </p>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-teal-300 uppercase px-2 mb-1 tracking-wider">
-                  <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Producto Prescripto</div>
-                  <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Dosis / ha</div>
-                  <div className="col-span-2">Presentación / Envase</div>
-                  <div className="col-span-2 text-right">Requerimiento Lote</div>
-                  {isAdmin && <div className="col-span-2 text-right">Precio Unit. / Subtotal</div>}
-                  <div className="col-span-1 text-center">Acciones</div>
-                </div>
-
-                {form.receta_json.map((r, idx) => {
-                  const calc = calcularRenglonInsumo(r, totHaActual, dolarRef);
-                  return (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
-                    >
-                      {/* Producto y Función */}
-                      <div className={(isAdmin ? 'col-span-3' : 'col-span-4') + ' space-y-1'}>
-                        <input
-                          type="text"
-                          placeholder="Producto (ej: Raigrás, Glifosato...)"
-                          value={r.producto || ''}
-                          onChange={(e) => updateRecetaRow(idx, 'producto', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-semibold text-xs"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Función (Semilla, Herbicida...)"
-                          value={r.funcion || ''}
-                          onChange={(e) => updateRecetaRow(idx, 'funcion', e.target.value)}
-                          className="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-0.5 text-[10px] text-slate-400"
-                        />
-                      </div>
-
-                      {/* Dosis / ha */}
-                      <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={r.dosis_ha ?? ''}
-                            onChange={(e) => updateRecetaRow(idx, 'dosis_ha', e.target.value)}
-                            placeholder="Dosis"
-                            className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-emerald-400 font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-[10px] text-slate-400 font-semibold shrink-0">
-                            {calc.pres.unidadBase}/ha
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Selector de Presentación / Unidad */}
-                      <div className="col-span-2">
-                        <select
-                          value={r.presentacion || calc.pres.id}
-                          onChange={(e) => updateRecetaRow(idx, 'presentacion', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs font-medium"
-                        >
-                          {PRESENTACIONES_INSUMOS.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Requerimiento Total Lote + Envases sugeridos */}
-                      <div className="col-span-2 text-right font-mono pr-1">
-                        <div className="text-white font-bold text-xs">
-                          {calc.totalExacto.toLocaleString('es-AR', { maximumFractionDigits: 1 })}{' '}
-                          <span className="text-[10px] text-slate-400">{calc.pres.unidadBase}</span>
-                        </div>
-                        {calc.hasEnvase && calc.envasesSugeridos > 0 && (
-                          <div className="text-[10px] text-teal-300 font-semibold">
-                            📦 {calc.envasesSugeridos} {calc.pres.envase} (= {calc.totalRedondeado.toLocaleString('es-AR')}{' '}
-                            {calc.pres.unidadBase})
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Precio Unitario y Subtotal en USD y ARS (Solo Modo Admin) */}
-                      {isAdmin && (
-                        <div className="col-span-2 text-right space-y-0.5">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => updateRecetaRow(idx, 'moneda', calc.moneda === 'USD' ? 'ARS' : 'USD')}
-                              className={'px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ' + (calc.moneda === 'USD' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-blue-500/20 text-blue-300 border border-blue-500/40')}
-                            >
-                              {calc.moneda}
-                            </button>
-                            <NumericInput
-                              value={r.precio_unitario ?? ''}
-                              onChange={(val) => updateRecetaRow(idx, 'precio_unitario', val)}
-                              allowDecimals={true}
-                              maxDecimals={2}
-                              placeholder={calc.hasEnvase ? `Precio/${calc.pres.envase === 'bolsas' ? 'Bolsa' : 'Envase'}` : `Precio/${calc.pres.unidadBase}`}
-                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="text-[9px] text-slate-400">
-                            {calc.hasEnvase ? `Precio / ${calc.pres.envase === 'bolsas' ? 'Bolsa' : 'Envase'}` : `Precio / ${calc.pres.unidadBase}`}
-                            {calc.hasEnvase && calc.precioBase > 0 && ` (≈ $${calc.precioBase.toFixed(2)}/${calc.pres.unidadBase})`}
-                          </div>
-                          {calc.subtotalUsd > 0 && (
-                            <div className="text-[10px] font-mono font-bold text-emerald-400">
-                              USD ${Math.round(calc.subtotalUsd).toLocaleString('es-AR')}{' '}
-                              <span className="text-slate-400 font-normal">(${calc.costoHaUsd.toFixed(1)}/ha)</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Botón Volcar a Insumos y Borrar */}
-                      <div className="col-span-1 flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleVolcarRecetaAInsumos(idx)}
-                          className="p-1 rounded bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
-                          title="Volcar automáticamente a Insumos Reales"
-                        >
-                          <ArrowDownToLine className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeRecetaRow(idx)}
-                          className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer transition"
-                          title="Eliminar fila"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* SECCIÓN 3: Insumos y Remitos Aplicados (Reales) */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                <span>3. Insumos y Remitos Aplicados (Reales)</span>
-              </h4>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => triggerScanSection('insumos')}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                  title="Subir archivo o foto de remito/factura de insumos con IA"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>✨ Leer Remito con IA</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={addInsumoRow}
-                  className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Cargar Remito / Aplicación</span>
-                </button>
-              </div>
-            </div>
-
+            {/* TABLA ÚNICA DE INSUMOS */}
             {form.insumos_json.length === 0 ? (
-              <p className="text-slate-500 italic text-center py-3">
-                No hay remitos ni insumos aplicados registrados aún. Usá "↓ Volcar" en la receta o "+ Cargar Remito".
+              <p className="text-slate-500 italic text-center py-4 text-xs">
+                No hay insumos cargados para este lote. Agregá semillas, fertilizantes o agroquímicos con "+ Agregar Insumo", "📦 Asistente Semilla" o importalos con IA.
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-3 text-[10px] font-bold text-amber-300 uppercase px-2 mb-1 tracking-wider">
-                  <div className="col-span-2">Fecha & Remito</div>
-                  <div className="col-span-2">Producto & Proveedor</div>
-                  <div className="col-span-2">Presentación / Envase</div>
-                  <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Modo & Cantidad</div>
-                  {isAdmin && <div className="col-span-3 text-right pl-3">Precio Unitario & Subtotal</div>}
+                <div className="grid grid-cols-12 gap-3 text-[10px] font-bold text-emerald-300 uppercase px-2 mb-1 tracking-wider">
+                  <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Tipo & Producto</div>
+                  <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Presentación / Envase</div>
+                  <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Cantidad / Dosis</div>
+                  {isAdmin && <div className="col-span-2 text-right">Precio Unitario</div>}
+                  {isAdmin && <div className="col-span-1 text-right">Subtotal</div>}
                   <div className="col-span-1 text-center">Acción</div>
                 </div>
 
@@ -4505,51 +4243,53 @@ function SiembraEditModal({
                   const calc = calcularRenglonInsumo(ins, totHaActual, dolarRef);
                   return (
                     <div
-                      key={idx}
+                      key={ins.id || idx}
                       className="grid grid-cols-12 gap-3 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
                     >
-                      {/* Fecha y Remito */}
-                      <div className="col-span-2 space-y-1">
-                        <input
-                          type="date"
-                          value={ins.fecha || ''}
-                          onChange={(e) => updateInsumoRow(idx, 'fecha', e.target.value)}
-                          onClick={(e) => e.currentTarget.showPicker?.()}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-white text-[10px] cursor-pointer focus:border-emerald-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="N° Remito"
-                          value={ins.remito || ''}
-                          onChange={(e) => updateInsumoRow(idx, 'remito', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-slate-300 text-[10px]"
-                        />
+                      {/* 1. Tipo & Producto */}
+                      <div className={(isAdmin ? 'col-span-3' : 'col-span-4') + ' space-y-1'}>
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={ins.tipo || 'Agroquímico'}
+                            onChange={(e) => updateInsumoRow(idx, 'tipo', e.target.value)}
+                            className="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-emerald-400 focus:outline-none"
+                          >
+                            <option value="Semilla">🌱 Semilla</option>
+                            <option value="Fertilizante">🧪 Fertilizante</option>
+                            <option value="Agroquímico">🛡️ Agroquímico</option>
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Nombre del producto / híbrido"
+                            value={ins.producto || ''}
+                            onChange={(e) => updateInsumoRow(idx, 'producto', e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-semibold text-xs focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            placeholder="Proveedor / Cooperativa (opcional)"
+                            value={ins.proveedor || ''}
+                            onChange={(e) => updateInsumoRow(idx, 'proveedor', e.target.value)}
+                            className="w-1/2 bg-slate-950/60 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400"
+                          />
+                          <input
+                            type="text"
+                            placeholder="N° Remito (opcional)"
+                            value={ins.remito || ''}
+                            onChange={(e) => updateInsumoRow(idx, 'remito', e.target.value)}
+                            className="w-1/2 bg-slate-950/60 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400"
+                          />
+                        </div>
                       </div>
 
-                      {/* Producto y Proveedor */}
-                      <div className="col-span-2 space-y-1">
-                        <input
-                          type="text"
-                          placeholder="Producto / Insumo"
-                          value={ins.producto || ''}
-                          onChange={(e) => updateInsumoRow(idx, 'producto', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-amber-300 font-semibold text-xs"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Proveedor / Cooperativa"
-                          value={ins.proveedor || ''}
-                          onChange={(e) => updateInsumoRow(idx, 'proveedor', e.target.value)}
-                          className="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-0.5 text-[10px] text-slate-400"
-                        />
-                      </div>
-
-                      {/* Presentación / Envase */}
-                      <div className="col-span-2 space-y-1">
+                      {/* 2. Presentación / Envase */}
+                      <div className={(isAdmin ? 'col-span-2' : 'col-span-3') + ' space-y-1'}>
                         <select
                           value={ins.presentacion || calc.pres.id}
                           onChange={(e) => updateInsumoRow(idx, 'presentacion', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-200"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 font-medium focus:outline-none focus:border-emerald-500"
                         >
                           {PRESENTACIONES_INSUMOS.map((p) => (
                             <option key={p.id} value={p.id}>
@@ -4557,13 +4297,13 @@ function SiembraEditModal({
                             </option>
                           ))}
                         </select>
-                        <div className="text-[9.5px] text-slate-400 px-0.5">
+                        <div className="text-[9.5px] text-slate-400 px-0.5 truncate">
                           {calc.hasEnvase ? `${calc.pres.factor} ${calc.pres.unidadBase} / ${calc.pres.envase === 'bolsas' ? 'bolsa' : 'envase'}` : 'Unidad directa'}
                         </div>
                       </div>
 
-                      {/* Modo & Cantidad (Dosis/ha vs Cantidad Total) */}
-                      <div className={(isAdmin ? 'col-span-2' : 'col-span-3') + ' space-y-1 min-w-0'}>
+                      {/* 3. Cantidad / Dosis con toggle explícito */}
+                      <div className={(isAdmin ? 'col-span-3' : 'col-span-4') + ' space-y-1 min-w-0'}>
                         <div className="flex items-center gap-1 mb-1">
                           <button
                             type="button"
@@ -4571,12 +4311,12 @@ function SiembraEditModal({
                               updateInsumoRow(idx, 'modo_calculo', 'dosis');
                               if (!ins.dosis_ha && calc.dosisReal > 0) updateInsumoRow(idx, 'dosis_ha', calc.dosisReal);
                             }}
-                            className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
+                            className={`px-2 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                               calc.modoCalculo === 'dosis'
-                                ? 'bg-amber-500 text-slate-950 font-black shadow-2xs'
+                                ? 'bg-emerald-600 text-white font-black shadow-2xs'
                                 : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                             }`}
-                            title="Calcular a partir de la dosis prescripta por hectárea"
+                            title="Calcular total automáticamente desde la dosis por hectárea"
                           >
                             Dosis/ha
                           </button>
@@ -4586,12 +4326,12 @@ function SiembraEditModal({
                               updateInsumoRow(idx, 'modo_calculo', 'total');
                               if (!ins.cantidad) updateInsumoRow(idx, 'cantidad', calc.hasEnvase ? calc.cantEnvases : calc.totalBase);
                             }}
-                            className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
+                            className={`px-2 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                               calc.modoCalculo === 'total'
-                                ? 'bg-amber-500 text-slate-950 font-black shadow-2xs'
+                                ? 'bg-emerald-600 text-white font-black shadow-2xs'
                                 : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                             }`}
-                            title="Ingresar cantidad total de envases o kilos aplicados"
+                            title="Ingresar cantidad total de envases o unidades físicas"
                           >
                             Cant. Total
                           </button>
@@ -4599,7 +4339,7 @@ function SiembraEditModal({
 
                         {calc.modoCalculo === 'dosis' ? (
                           <>
-                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
+                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-emerald-500 transition min-w-0">
                               <NumericInput
                                 value={ins.dosis_ha ?? ''}
                                 placeholder="0"
@@ -4608,21 +4348,18 @@ function SiembraEditModal({
                                 maxDecimals={2}
                                 className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
                               />
-                              <span
-                                className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
-                                title={`${calc.pres.unidadBase}/ha`}
-                              >
+                              <span className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0">
                                 {calc.pres.unidadBase}/ha
                               </span>
                             </div>
                             <div className="text-[9.5px] font-mono text-emerald-400 font-semibold mt-0.5 truncate">
-                              = {calc.totalBase.toLocaleString('es-AR')} {calc.pres.unidadBase} totales
-                              {calc.hasEnvase && ` (${calc.cantEnvases} ${calc.pres.envase})`}
+                              = {calc.totalBase.toLocaleString('es-AR')} {calc.pres.unidadBase}
+                              {calc.hasEnvase && ` · ${calc.cantEnvases} ${calc.pres.envase} (${calc.pres.factor} ${calc.pres.unidadBase})`}
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
+                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-emerald-500 transition min-w-0">
                               <NumericInput
                                 value={ins.cantidad ?? ''}
                                 placeholder={calc.hasEnvase ? (calc.pres.envase || 'Bolsas') : '0'}
@@ -4631,10 +4368,7 @@ function SiembraEditModal({
                                 maxDecimals={2}
                                 className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
                               />
-                              <span
-                                className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
-                                title={calc.hasEnvase ? (calc.pres.envase || 'bolsas') : calc.pres.unidadBase}
-                              >
+                              <span className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0">
                                 {calc.hasEnvase ? (calc.pres.envase || 'bolsas') : calc.pres.unidadBase}
                               </span>
                             </div>
@@ -4642,66 +4376,67 @@ function SiembraEditModal({
                               {calc.hasEnvase ? (
                                 <>
                                   = {calc.totalBase.toLocaleString('es-AR')} {calc.pres.unidadBase} ·{' '}
-                                  <span className="text-amber-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
+                                  <span className="text-teal-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
                                 </>
                               ) : (
-                                <>
-                                  <span className="text-amber-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
-                                </>
+                                <span className="text-teal-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
                               )}
                             </div>
                           </>
                         )}
                       </div>
 
-                      {/* Precio Unitario & Subtotal Calculado (Solo Modo Admin) */}
+                      {/* 4. Precio Unitario (Solo Modo Admin / Económico) */}
                       {isAdmin && (
-                        <div className="col-span-3 text-right space-y-1 pl-3 border-l border-slate-800/60 min-w-0">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <div className="col-span-2 space-y-1 text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
                               onClick={() => updateInsumoRow(idx, 'moneda', calc.moneda === 'USD' ? 'ARS' : 'USD')}
-                              className={
-                                'px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer border shrink-0 transition ' +
-                                (calc.moneda === 'USD'
+                              className={`px-1.5 py-0.5 rounded text-[9.5px] font-black cursor-pointer border shrink-0 transition ${
+                                calc.moneda === 'USD'
                                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                  : 'bg-blue-500/20 text-blue-300 border-blue-500/40')
-                              }
+                                  : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                              }`}
                               title="Cambiar moneda (USD / ARS)"
                             >
                               {calc.moneda}
                             </button>
                             <NumericInput
                               value={ins.precio_unitario ?? ''}
-                              placeholder={`P. Unit / ${calc.unidadPrecio}`}
+                              placeholder="0,00"
                               onChange={(val) => updateInsumoRow(idx, 'precio_unitario', val)}
                               allowDecimals={true}
                               maxDecimals={2}
-                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-amber-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400"
+                              className="w-full min-w-[90px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500"
                             />
                           </div>
-                          <div className="text-[9.5px] text-slate-400 pr-1">
+                          <div className="text-[9px] text-slate-400 pr-1 truncate">
                             Precio / {calc.unidadPrecio}
                             {calc.hasEnvase && calc.precioBase > 0 && (
                               <span className="text-slate-500 font-mono"> (≈ ${calc.precioBase.toFixed(2)}/{calc.pres.unidadBase})</span>
                             )}
                           </div>
-                          <div className="bg-slate-950/90 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                              Subtotal Calculado:
-                            </div>
-                            <div className="text-xs font-mono font-black text-emerald-400">
-                              {calc.moneda} ${calc.subtotalUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                              <span className="text-[9.5px] text-slate-400 font-normal">(${calc.costoHaUsd.toFixed(1)}/ha)</span>
-                            </div>
-                            <div className="text-[9.5px] font-mono text-slate-400">
-                              ≈ ARS ${Math.round(calc.subtotalArs).toLocaleString('es-AR')}
-                            </div>
-                          </div>
                         </div>
                       )}
 
-                      {/* Botón Borrar */}
+                      {/* 5. Subtotal Calculado (Solo Modo Admin / Económico) */}
+                      {isAdmin && (
+                        <div className="col-span-1 text-right">
+                          <div className="text-xs font-mono font-black text-emerald-400 truncate">
+                            {calc.subtotalUsd > 0
+                              ? `USD $${Math.round(calc.subtotalUsd).toLocaleString('es-AR')}`
+                              : '$0,00'}
+                          </div>
+                          {calc.subtotalUsd > 0 && (
+                            <div className="text-[9px] font-mono text-slate-400 truncate">
+                              ${calc.costoHaUsd.toFixed(1)}/ha
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 6. Acción Borrar */}
                       <div className="col-span-1 text-center">
                         <button
                           type="button"
@@ -4719,12 +4454,12 @@ function SiembraEditModal({
             )}
           </div>
 
-          {/* SECCIÓN 4: Labores Agrícolas & Contratista */}
+          {/* SECCIÓN 3: Labores Agrícolas & Contratista */}
           <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-400" />
-                <span>4. Labores Agrícolas & Contratista (Maquinaria)</span>
+                <span>3. Labores Agrícolas & Contratista (Maquinaria)</span>
               </h4>
               <div className="flex items-center gap-2">
                 <button
@@ -4986,7 +4721,7 @@ function SiembraEditModal({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 {/* Cultivo / Variedad */}
                 <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-teal-400 font-bold block uppercase tracking-wider mb-0.5">🌱 Recurso Forrajero</span>
+                  <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider mb-0.5">🌱 Recurso Forrajero</span>
                   <span className="text-xs font-black text-white truncate block">
                     {form.cultivo_variedad || 'Pastura'}
                   </span>
@@ -4995,25 +4730,25 @@ function SiembraEditModal({
                   </span>
                 </div>
 
-                {/* Receta */}
+                {/* Insumos del lote */}
                 <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-teal-300 font-bold block uppercase tracking-wider mb-0.5">📋 Prescripción Técnica</span>
+                  <span className="text-[10px] text-teal-300 font-bold block uppercase tracking-wider mb-0.5">📦 Insumos del Lote</span>
                   <span className="text-sm font-black text-teal-400 font-mono block">
-                    {form.receta_json.length} {form.receta_json.length === 1 ? 'producto' : 'productos'}
+                    {form.insumos_json.length} {form.insumos_json.length === 1 ? 'insumo' : 'insumos'}
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    dosificados para {totHaActual.toFixed(1)} ha
+                    semillas, fertilizantes y químicos
                   </span>
                 </div>
 
-                {/* Insumos */}
+                {/* Superficie Total */}
                 <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-amber-400 font-bold block uppercase tracking-wider mb-0.5">🧪 Insumos Aplicados</span>
+                  <span className="text-[10px] text-amber-400 font-bold block uppercase tracking-wider mb-0.5">📐 Área de Labor</span>
                   <span className="text-sm font-black text-amber-300 font-mono block">
-                    {form.insumos_json.length} {form.insumos_json.length === 1 ? 'aplicación' : 'aplicaciones'}
+                    {totHaActual.toFixed(1)} ha
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    con remitos de campo
+                    {isMultiPotrero ? `${selectedPotreros.length} potreros` : `Potrero #${form.potrero_numero}`}
                   </span>
                 </div>
 
