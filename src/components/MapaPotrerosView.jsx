@@ -1955,7 +1955,7 @@ export default function MapaPotrerosView({
         caminos: false,
         alambres_electricos: false,
       }));
-      notify?.('Todas las capas de infraestructura apagadas (mapa limpio).', 'info');
+      notify?.('Todas las capas de infraestructura desactivadas.', 'info');
     } else {
       setLayersVisible((prev) => ({
         ...prev,
@@ -1964,9 +1964,13 @@ export default function MapaPotrerosView({
         corrales_mangas: true,
         tranqueras: true,
         montes_sombra: true,
+        casco_edificaciones: true,
+        mangrullo: true,
+        paneles_solares: true,
+        caminos: true,
         alambres_electricos: true,
       }));
-      notify?.('Capas esenciales de infraestructura activadas.', 'info');
+      notify?.('Todas las capas de infraestructura activadas.', 'info');
     }
   }
 
@@ -3024,9 +3028,10 @@ export default function MapaPotrerosView({
               }
             }
 
-            const effectiveDensity = labelDensity === 'auto'
-              ? (currentZoom <= 13 ? 'compacto' : currentZoom === 14 ? 'intermedio' : 'detallado')
-              : labelDensity;
+            const showNames = Boolean(layersVisible.etiquetas_marcadores ?? true);
+            const effectiveDensity = !showNames
+              ? 'compacto'
+              : (currentZoom <= 13 ? 'intermedio' : 'detallado');
 
             let labelHtml = '';
             if (effectiveDensity === 'compacto') {
@@ -3306,9 +3311,10 @@ export default function MapaPotrerosView({
           }
         }
 
-        const effectiveDensity = labelDensity === 'auto'
-          ? (currentZoom <= 13 ? 'compacto' : currentZoom === 14 ? 'intermedio' : 'detallado')
-          : labelDensity;
+        const showNames = Boolean(layersVisible.etiquetas_marcadores ?? true);
+        const effectiveDensity = !showNames
+          ? 'compacto'
+          : (currentZoom <= 13 ? 'intermedio' : 'detallado');
 
         const badgeBorder = isResourceMode
           ? (isPasturasMode ? '#059669' : '#0284c7')
@@ -3693,15 +3699,15 @@ export default function MapaPotrerosView({
         (inf.observaciones && inf.observaciones.includes('[icono:')) ||
         (inf.componentes_detalle && inf.componentes_detalle.includes('icono:'))
       );
+      // Si Mostrar nombres en marcadores está ON, se muestra la cápsula completa de texto (o al reubicar/seleccionar).
+      // Si está OFF, se muestra sólo el ícono circular compacto con tooltip al hover/tap para una vista ultra limpia.
+      const showNames = Boolean(layersVisible.etiquetas_marcadores ?? true);
       const isBeingMoved = Boolean(movingInfra && movingInfra.id === inf.id);
       const isSelected = Boolean(editingInfra && editingInfra.id === inf.id);
       const isDraggable = Boolean(isBeingMoved || dragMarkersEnabled);
 
-      // En vista general (currentZoom < 15), mostrar solo ícono compacto sin texto para evitar superposiciones,
-      // excepto si el marcador está seleccionado o siendo reubicado, o si el usuario desactivó etiquetas explícitamente.
-      const allowLabelByZoom = currentZoom >= 15 || isBeingMoved || isSelected;
-      const globalShowLabels = Boolean((layersVisible.etiquetas_marcadores ?? true) && allowLabelByZoom);
-      const effectiveStyle = globalShowLabels ? inf.estilo_marcador : 'icono';
+      const globalShowLabels = Boolean(showNames || isBeingMoved || isSelected);
+      const effectiveStyle = globalShowLabels ? (inf.estilo_marcador || 'chip_icono_texto') : 'icono';
 
       const icon = buildInfraDivIcon(inf, effectiveStyle, isDraggable, globalShowLabels, isBeingMoved);
 
@@ -5726,41 +5732,14 @@ async function handleSaveSidePanel(e) {
                         />
                       </label>
 
-                      {/* Selector de Densidad de Carteles (Anti-superposición) */}
-                      <div className="pt-1.5 pb-1 px-1 bg-slate-900/60 rounded-xl border border-slate-800/80">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-0.5">
-                          <span>📏 Densidad Carteles</span>
-                          <span className="text-[9px] text-emerald-400 font-bold">
-                            {labelDensity === 'auto' ? `Auto (Z${currentZoom})` : labelDensity === 'compacto' ? 'Compacto' : 'Detallado'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {[
-                            { id: 'auto', label: '⚡ Auto' },
-                            { id: 'compacto', label: '🏷️ P# & Cab.' },
-                            { id: 'detallado', label: '📋 Detallado' },
-                          ].map((d) => (
-                            <button
-                              key={d.id}
-                              type="button"
-                              onClick={() => setLabelDensity(d.id)}
-                              className={`px-1.5 py-1 rounded-lg text-[10px] font-bold text-center transition border ${
-                                labelDensity === d.id
-                                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
-                                  : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-800'
-                              }`}
-                            >
-                              {d.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Toggle Rápido: Mostrar texto en marcadores de infraestructura */}
-                      <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg" title="Alternar entre Chips legibles con texto o compactar a Solo Ícono">
-                        <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                          <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                          🏷️ Etiquetas en Marcadores
+                      {/* Control Unificado: Mostrar nombres en marcadores */}
+                      <label
+                        className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 transition"
+                        title="Activado (ON): Muestra cápsulas con texto explicativo en infraestructura y detalles en potreros. Desactivado (OFF): Muestra solo íconos compactos para máxima visibilidad."
+                      >
+                        <span className="flex items-center gap-2 text-[11px] font-bold text-sky-200">
+                          <Tags className="w-3.5 h-3.5 text-sky-400" />
+                          Mostrar nombres en marcadores
                         </span>
                         <input
                           type="checkbox"
@@ -5771,7 +5750,7 @@ async function handleSaveSidePanel(e) {
                               etiquetas_marcadores: !(prev.etiquetas_marcadores ?? true),
                             }))
                           }
-                          className="rounded border-slate-600 text-emerald-500 focus:ring-0"
+                          className="rounded border-slate-600 text-sky-500 focus:ring-0 w-3.5 h-3.5"
                         />
                       </label>
 
@@ -5800,7 +5779,7 @@ async function handleSaveSidePanel(e) {
                               title={
                                 isAnyInfraOn
                                   ? 'Apagar toda la infraestructura con 1 clic (mapa limpio)'
-                                  : 'Prender infraestructura esencial con 1 clic'
+                                  : 'Prender todas las categorías de infraestructura con 1 clic'
                               }
                             >
                               <input
@@ -5816,7 +5795,7 @@ async function handleSaveSidePanel(e) {
 
                         {infraGroupOpen && (
                           <div className="space-y-2.5 pt-1 border-t border-slate-700/60">
-                            {/* 1. Esenciales / Operativos (activos por defecto) */}
+                            {/* 1. Esenciales / Operativos */}
                             <div className="space-y-1">
                               <div className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
@@ -5826,6 +5805,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'molinos',
                                   label: `Molinos (${infraCounts.molinos})`,
+                                  count: infraCounts.molinos,
                                   badge:
                                     infraCounts.molinosSolares > 0
                                       ? `☀️ ${infraCounts.molinosSolares}`
@@ -5841,6 +5821,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'tanques_bebidas',
                                   label: `Tanques y Bebidas (${infraCounts.tanquesBebidas})`,
+                                  count: infraCounts.tanquesBebidas,
                                   dot: 'bg-cyan-400',
                                   checked: Boolean(layersVisible.tanques_bebidas),
                                   onToggle: () =>
@@ -5852,6 +5833,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'corrales_mangas',
                                   label: `Corrales y Mangas (${infraCounts.corrales})`,
+                                  count: infraCounts.corrales,
                                   dot: 'bg-orange-500',
                                   checked: Boolean(layersVisible.corrales_mangas),
                                   onToggle: () =>
@@ -5863,6 +5845,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'tranqueras',
                                   label: `Tranqueras (${infraCounts.tranqueras})`,
+                                  count: infraCounts.tranqueras,
                                   badge:
                                     infraCounts.tranquerones > 0
                                       ? `🚜 ${infraCounts.tranquerones} TQN`
@@ -5878,6 +5861,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'montes_sombra',
                                   label: `Montes / Sombra (${infraCounts.montesSombra})`,
+                                  count: infraCounts.montesSombra,
                                   dot: 'bg-emerald-700',
                                   checked: Boolean(layersVisible.montes_sombra),
                                   onToggle: () =>
@@ -5886,7 +5870,9 @@ async function handleSaveSidePanel(e) {
                                       montes_sombra: !prev.montes_sombra,
                                     })),
                                 },
-                              ].map((item) => (
+                              ]
+                                .filter((item) => item.count > 0)
+                                .map((item) => (
                                 <label
                                   key={item.key}
                                   className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
@@ -5910,7 +5896,7 @@ async function handleSaveSidePanel(e) {
                               ))}
                             </div>
 
-                            {/* 2. Edificaciones / Secundarios (apagados por defecto) */}
+                            {/* 2. Edificaciones / Secundarios */}
                             <div className="space-y-1 pt-1.5 border-t border-slate-700/60">
                               <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
                                 <Eye className="w-3 h-3 text-slate-400" />
@@ -5920,6 +5906,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'casco_edificaciones',
                                   label: `Casco, Casas y Galpones (${infraCounts.casco})`,
+                                  count: infraCounts.casco,
                                   dot: 'bg-slate-400',
                                   checked: Boolean(layersVisible.casco_edificaciones),
                                   onToggle: () =>
@@ -5931,6 +5918,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'mangrullo',
                                   label: `Mangrullo / Bomba Casco (${infraCounts.mangrullo})`,
+                                  count: infraCounts.mangrullo,
                                   dot: 'bg-teal-400',
                                   checked: Boolean(layersVisible.mangrullo),
                                   onToggle: () =>
@@ -5942,6 +5930,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'paneles_solares',
                                   label: `Paneles Solares (${infraCounts.panelesSolares})`,
+                                  count: infraCounts.panelesSolares,
                                   dot: 'bg-yellow-400',
                                   checked: Boolean(layersVisible.paneles_solares),
                                   onToggle: () =>
@@ -5953,6 +5942,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'caminos',
                                   label: `Caminos Operativos (${caminosOperativos.length})`,
+                                  count: caminosOperativos.length,
                                   dot: 'bg-slate-300',
                                   checked: Boolean(layersVisible.caminos),
                                   onToggle: () =>
@@ -5964,6 +5954,7 @@ async function handleSaveSidePanel(e) {
                                 {
                                   key: 'alambres_electricos',
                                   label: `Alambres Eléctricos / Parcelas (${alambresElectricos.length})`,
+                                  count: alambresElectricos.length,
                                   dot: 'bg-amber-400',
                                   checked: Boolean(layersVisible.alambres_electricos),
                                   onToggle: () =>
@@ -5972,7 +5963,9 @@ async function handleSaveSidePanel(e) {
                                       alambres_electricos: !prev.alambres_electricos,
                                     })),
                                 },
-                              ].map((item) => (
+                              ]
+                                .filter((item) => item.count > 0)
+                                .map((item) => (
                                 <label
                                   key={item.key}
                                   className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
@@ -7186,12 +7179,12 @@ async function handleSaveSidePanel(e) {
               }`}
               title={
                 Boolean(layersVisible.etiquetas_marcadores ?? true)
-                  ? 'Etiquetas de marcadores visibles (activas con zoom ≥ 15). Clic para ocultar todas.'
-                  : 'Etiquetas de marcadores ocultas. Clic para activar.'
+                  ? 'Nombres en marcadores activados (cápsula completa). Clic para compactar a solo íconos.'
+                  : 'Nombres en marcadores desactivados (solo íconos compactos). Clic para mostrar nombres.'
               }
             >
               <Tags className={`w-3.5 h-3.5 ${Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'text-sky-400' : 'text-slate-500'}`} />
-              <span>{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Etiquetas ON' : 'Etiquetas OFF'}</span>
+              <span>{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Nombres ON' : 'Nombres OFF'}</span>
             </button>
 
             {/* Selector de Mapa Base Satélite HD */}
@@ -8327,7 +8320,7 @@ async function handleSaveSidePanel(e) {
                     <span className="hidden sm:inline">+ Traza</span>
                   </button>
 
-                  {/* Toggle Rápido Etiquetas ON/OFF en Pantalla Completa */}
+                  {/* Toggle Rápido Nombres ON/OFF en Pantalla Completa */}
                   <button
                     type="button"
                     onClick={() =>
@@ -8343,12 +8336,12 @@ async function handleSaveSidePanel(e) {
                     }`}
                     title={
                       Boolean(layersVisible.etiquetas_marcadores ?? true)
-                        ? 'Etiquetas de marcadores visibles (activas con zoom ≥ 15). Clic para ocultar todas.'
-                        : 'Etiquetas de marcadores ocultas. Clic para activar.'
+                        ? 'Nombres en marcadores activados (cápsula completa). Clic para compactar a solo íconos.'
+                        : 'Nombres en marcadores desactivados (solo íconos compactos). Clic para mostrar nombres.'
                     }
                   >
                     <Tags className={`w-3.5 h-3.5 ${Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'text-sky-400' : 'text-slate-500'}`} />
-                    <span className="hidden sm:inline">{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Etiquetas ON' : 'Etiquetas OFF'}</span>
+                    <span className="hidden sm:inline">{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Nombres ON' : 'Nombres OFF'}</span>
                   </button>
 
                   {/* Selector de Satélite */}
