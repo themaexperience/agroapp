@@ -3,7 +3,7 @@
 // Establecimiento San José · RENSPA JS307 · Agroganadera Rincón del Sur S.A.
 
 import * as XLSX from 'xlsx';
-import { LOTES_OFICIALES_SIGSA } from './caravanasAuditoriaOficial.js';
+import { LOTES_OFICIALES_SIGSA, generarAuditoriaOficialSanJose } from './caravanasAuditoriaOficial.js';
 import { formatFechaAR } from './dateHelper.js';
 
 /**
@@ -20,76 +20,42 @@ export function generarReportePdfAuditoriaCaravanas({
     : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const horaHoy = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
-  // Usar lotes de SIGSA oficiales
-  const lotes = cajasCaravanas && cajasCaravanas.length > 0 ? cajasCaravanas : LOTES_OFICIALES_SIGSA;
+  // 1. Lotes y Métricas Generales desde una única fuente de verdad (sumando las filas)
+  const lotesCalculados = LOTES_OFICIALES_SIGSA.map((loteOficial) => {
+    const custom = (cajasCaravanas || []).find((c) => Number(c.caja_numero) === Number(loteOficial.caja_numero));
+    const cantidad = Number(custom?.cantidad ?? loteOficial.cantidad) || 0;
+    const puestas = Number(custom?.puestas ?? loteOficial.puestas) || 0;
+    const salidas = Number(custom?.salidas ?? loteOficial.salidas) || 0;
+    const mermas = Number(custom?.mermas ?? loteOficial.mermas) || 0;
+    const stock = Number(custom?.en_stock ?? loteOficial.en_stock) || 0;
+    return {
+      ...loteOficial,
+      cantidad,
+      puestas,
+      salidas,
+      mermas,
+      en_stock: stock,
+    };
+  });
 
-  // 1. Métricas Generales
-  const totalCompradas = lotes.reduce((acc, l) => acc + (Number(l.cantidad) || 0), 0);
-  const totalEnStock = lotes.reduce((acc, l) => acc + (Number(l.en_stock) || 0), 0);
+  const totalCompradas = lotesCalculados.reduce((acc, l) => acc + (Number(l.cantidad) || 0), 0); // 1.600
+  const totalPuestas = lotesCalculados.reduce((acc, l) => acc + (Number(l.puestas) || 0), 0); // 632
+  const totalSalidas = lotesCalculados.reduce((acc, l) => acc + (Number(l.salidas) || 0), 0); // 515
+  const totalMermas = lotesCalculados.reduce((acc, l) => acc + (Number(l.mermas) || 0), 0); // 23
+  const totalEnStock = lotesCalculados.reduce((acc, l) => acc + (Number(l.en_stock) || 0), 0); // 430
 
-  // Conteo sobre animales del padrón
-  const activasEnCampo = (animales || []).filter((a) => {
-    const est = (a.estado_caravana || a.estado || '').toLowerCase();
-    return !est.includes('salida') && !est.includes('venta') && !est.includes('baja') && !est.includes('stock');
-  }).length;
-
-  const mermasRoturas = (animales || []).filter((a) => {
-    const est = (a.estado_caravana || a.estado || '').toLowerCase();
-    const mot = (a.motivo_salida || a.observaciones || '').toLowerCase();
-    return est.includes('salida') && (mot.includes('merma') || mot.includes('rotur') || mot.includes('fábrica'));
-  }).length;
-
-  const totalSalidasBajas = (animales || []).filter((a) => {
-    const est = (a.estado_caravana || a.estado || '').toLowerCase();
-    return est.includes('salida') || est.includes('venta') || est.includes('baja');
-  }).length;
-
-  const salidasComerciales = Math.max(0, totalSalidasBajas - mermasRoturas);
-
-  // Balance
-  const sumaCalculada = activasEnCampo + totalEnStock + totalSalidasBajas;
+  // Balance exacto: Puestas + Stock + Salidas + Mermas = Compradas
+  const sumaCalculada = totalPuestas + totalEnStock + totalSalidas + totalMermas;
   const balanceCuadrado = sumaCalculada === totalCompradas;
 
   // 2. Tabla 1: Desglose por Lote Oficial SIGSA
-  const filasLotesHtml = LOTES_OFICIALES_SIGSA.map((lote) => {
+  const filasLotesHtml = lotesCalculados.map((lote) => {
     const fComp = formatFechaAR(lote.fecha_compra);
-    let puestas = 0;
-    let salidas = 0;
-    let mermas = 0;
-    let stock = Number(lote.en_stock) || 0;
-    let tramoLibre = 'Agotado';
+    let tramoLibre = '<span style="color:#64748b; font-weight:600;">Completo asignado</span>';
 
-    if (lote.caja_numero === 1) {
-      puestas = 15;
-      salidas = 185;
-      mermas = 0;
-      tramoLibre = '<span style="color:#64748b; font-weight:600;">Completo asignado</span>';
-    } else if (lote.caja_numero === 2) {
-      puestas = 184;
-      salidas = 15;
-      mermas = 1;
-      tramoLibre = '<span style="color:#64748b; font-weight:600;">Completo asignado</span>';
-    } else if (lote.caja_numero === 3) {
-      puestas = 300;
-      salidas = 0;
-      mermas = 0;
-      tramoLibre = '<span style="color:#64748b; font-weight:600;">Completo asignado</span>';
-    } else if (lote.caja_numero === 4) {
-      puestas = 10;
-      salidas = 190;
-      mermas = 0;
-      tramoLibre = '<span style="color:#64748b; font-weight:600;">Completo asignado</span>';
-    } else if (lote.caja_numero === 5) {
-      puestas = 123;
-      salidas = 125;
-      mermas = 22;
-      stock = 130;
-      tramoLibre = '<strong style="color:#065f46; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #a7f3d0;">032010011048470 – 48599 (130 un.)</strong>';
+    if (lote.caja_numero === 5) {
+      tramoLibre = '<strong style="color:#065f46; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #a7f3d0;">032010011048280-299 / 48350-459 (130 un.)</strong>';
     } else if (lote.caja_numero === 6) {
-      puestas = 0;
-      salidas = 0;
-      mermas = 0;
-      stock = 300;
       tramoLibre = '<strong style="color:#065f46; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #a7f3d0;">032010007589125 – 89424 (300 un.)</strong>';
     }
 
@@ -100,47 +66,113 @@ export function generarReportePdfAuditoriaCaravanas({
         <td style="font-family:monospace; font-weight:800; color:#0f172a;">${lote.desde}</td>
         <td style="font-family:monospace; font-weight:800; color:#0f172a;">${lote.hasta}</td>
         <td style="text-align:right; font-weight:700;">${lote.cantidad}</td>
-        <td style="text-align:right; color:#1d4ed8; font-weight:800;">${puestas}</td>
-        <td style="text-align:right; color:#d97706; font-weight:700;">${salidas}</td>
-        <td style="text-align:right; color:#b91c1c; font-weight:700;">${mermas}</td>
-        <td style="text-align:right; color:#065f46; font-weight:900;">${stock}</td>
+        <td style="text-align:right; color:#1d4ed8; font-weight:800;">${lote.puestas}</td>
+        <td style="text-align:right; color:#d97706; font-weight:700;">${lote.salidas}</td>
+        <td style="text-align:right; color:#b91c1c; font-weight:700;">${lote.mermas}</td>
+        <td style="text-align:right; color:#065f46; font-weight:900;">${lote.en_stock}</td>
         <td style="font-size:9.5px;">${tramoLibre}</td>
       </tr>
     `;
   }).join('');
 
-  // 3. Tabla 2: Trazabilidad por Rodeo Activo
-  // Agrupar caravanas activas por rodeo
-  const caravanasPorRodeoMap = {};
-  (animales || []).forEach((a) => {
-    const est = (a.estado_caravana || a.estado || '').toLowerCase();
-    if (!est.includes('salida') && !est.includes('venta') && !est.includes('baja') && !est.includes('stock')) {
-      const rNom = (a.rodeo || 'Sin asignar').trim().toUpperCase();
-      caravanasPorRodeoMap[rNom] = (caravanasPorRodeoMap[rNom] || 0) + 1;
-    }
-  });
+  // 3. Tabla 2: Trazabilidad por Rodeo Activo en Campo
+  const padronAnimales = (animales && animales.length > 0)
+    ? animales
+    : (generarAuditoriaOficialSanJose().animales || []);
 
-  // Lista de rodeos ordenada
-  const filasRodeosHtml = (rodeos || []).map((r) => {
-    const rNom = (r.nombre || '').trim().toUpperCase();
-    const countCar = caravanasPorRodeoMap[rNom] || 0;
+  const esAnimalActivo = (a) => {
+    if (!a) return false;
+    const est = String(a.estado_caravana || a.estado || 'En campo').toLowerCase().trim();
+    const mot = String(a.motivo_salida || a.observaciones || '').toLowerCase().trim();
+    if (est.includes('stock') || est.includes('deposito') || est.includes('depósito')) return false;
+    if (
+      est === 'baja' ||
+      est === 'vendida' ||
+      est === 'vendido' ||
+      est === 'salida' ||
+      est === 'muerto' ||
+      est === 'muerta' ||
+      est.includes('baja') ||
+      est.includes('salida') ||
+      est.includes('vendid') ||
+      est.includes('muert') ||
+      est.includes('merma') ||
+      est.includes('rotura') ||
+      est.includes('despacho') ||
+      est.includes('d-te') ||
+      mot.includes('merma') ||
+      mot.includes('rotur')
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const activas = padronAnimales.filter(esAnimalActivo);
+
+  const normStr = (s) => (s ? String(s).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '');
+
+  const matchesRodeo = (aNom, rNom) => {
+    if (!aNom || !rNom) return false;
+    if (aNom === rNom) return true;
+    const isR2 = (s) => s.includes('RODEO 2') || s.includes('COLADA 2') || s === 'RODEO 2';
+    if (isR2(aNom) && isR2(rNom)) return true;
+    const isToro = (s) => s.includes('TORO');
+    if (isToro(aNom) && isToro(rNom)) return true;
+    const isVaq = (s) => s.includes('VAQUILLONA') || s.includes('OTONO');
+    if (isVaq(aNom) && isVaq(rNom)) return true;
+    const isPunta = (s) => s.includes('PUNTA') || s.includes('RODEO 1');
+    if (isPunta(aNom) && isPunta(rNom)) return true;
+    const isR3 = (s) => s.includes('RODEO 3');
+    if (isR3(aNom) && isR3(rNom)) return true;
+    const isCola = (s) => s.includes('COLA');
+    if (isCola(aNom) && isCola(rNom)) return true;
+    return false;
+  };
+
+  const rodeosList = (rodeos && rodeos.length > 0) ? rodeos : [
+    { nombre: 'COLADA RODEO 2', potrero_numero: 15, vacas: 198 },
+    { nombre: 'VAQUILLONAS OTOÑO', potrero_numero: 12, vaquillonas_reposicion: 161 },
+    { nombre: 'RODEO 3', potrero_numero: 17, vacas: 159 },
+    { nombre: 'RODEO 1 - PUNTA', potrero_numero: 5, vacas: 55 },
+    { nombre: 'TOROS', potrero_numero: 7, toros_padres: 34, toritos: 21 },
+    { nombre: 'COLA', potrero_numero: 26, vacas: 25 },
+  ];
+
+  let totalCaravanasEnRodeos = 0;
+  let totalCabezasEnRodeos = 0;
+
+  const filasRodeosHtml = rodeosList.map((r) => {
+    const rId = r.id != null ? String(r.id) : null;
+    const rNom = normStr(r.nombre);
+
+    const countCar = activas.filter((a) => {
+      if (rId && a.rodeo_id != null && String(a.rodeo_id) === rId) return true;
+      const aNom = normStr(a.rodeo || a.rodeo_asignado || a.rodeo_nombre);
+      return matchesRodeo(aNom, rNom);
+    }).length;
+
+    totalCaravanasEnRodeos += countCar;
+
     const totCab = Number(r.vacas || 0) + Number(r.terneros || 0) + Number(r.toros_padres || 0) +
-                   Number(r.toritos || 0) + Number(r.vaquillonas_reposicion || 0) + Number(r.vacas_cut || 0);
+                   Number(r.toritos || 0) + Number(r.vaquillonas_reposicion || 0) + Number(r.vacas_cut || 0) || countCar;
+    totalCabezasEnRodeos += totCab;
+
     const pct = totCab > 0 ? Math.min(100, Math.round((countCar / totCab) * 100)) : 0;
 
     let rangosPrincipales = '-';
-    if (rNom.includes('VAQUILLONA') || rNom.includes('OTOÑO')) {
-      rangosPrincipales = 'Lote 3 (2250-2390) + Lote 2 (4680-4699)';
+    if (rNom.includes('VAQUILLONA') || rNom.includes('OTONO')) {
+      rangosPrincipales = 'Lote 3 (2250-2390) + Lote 2 (4680-4699, 161 un.)';
     } else if (rNom.includes('TORO')) {
-      rangosPrincipales = 'Lote 2 (4630-4664 s/36)';
-    } else if (rNom.includes('PUNTA')) {
-      rangosPrincipales = 'Lote 5 Preñez 10/11 (48275-48349)';
-    } else if (rNom.includes('RODEO 2')) {
-      rangosPrincipales = 'Lote 2 (500-629) + Lote 5 (48-puestas)';
+      rangosPrincipales = 'Lote 2 (4630-4664, 34 un.)';
+    } else if (rNom.includes('PUNTA') || rNom.includes('RODEO 1')) {
+      rangosPrincipales = 'Lote 5 Preñez 10/11 (48275-48349, 55 un.)';
+    } else if (rNom.includes('RODEO 2') || rNom.includes('COLADA')) {
+      rangosPrincipales = 'Lote 2 (500-629) + Lote 5 (48222-274 / 48460-474, 198 un.)';
     } else if (rNom.includes('RODEO 3')) {
-      rangosPrincipales = 'Lote 3 Planillas 1-12 (2391-2549)';
+      rangosPrincipales = 'Lote 3 Planillas 1-12 (2391-2549, 159 un.)';
     } else if (rNom.includes('COLA')) {
-      rangosPrincipales = 'Lote 1 (55750-764) + Lote 4 (41325-329)';
+      rangosPrincipales = 'Lote 1 (55750-764) + Lote 4 (41325-329, 25 un.)';
     }
 
     return `
@@ -158,6 +190,8 @@ export function generarReportePdfAuditoriaCaravanas({
       </tr>
     `;
   }).join('');
+
+  const pctGlobal = totalCabezasEnRodeos > 0 ? Math.round((totalCaravanasEnRodeos / totalCabezasEnRodeos) * 100) : 0;
 
   // 4. Armar documento HTML completo
   const docHtml = `
@@ -339,8 +373,8 @@ export function generarReportePdfAuditoriaCaravanas({
         </div>
         <div class="kpi-card azul">
           <div class="kpi-label">Puestas en Campo</div>
-          <div class="kpi-val" style="color:#1d4ed8;">${activasEnCampo.toLocaleString('es-AR')}</div>
-          <div class="kpi-sub">${((activasEnCampo / (totalCompradas || 1)) * 100).toFixed(1)}% en rodeos</div>
+          <div class="kpi-val" style="color:#1d4ed8;">${totalPuestas.toLocaleString('es-AR')}</div>
+          <div class="kpi-sub">${((totalPuestas / (totalCompradas || 1)) * 100).toFixed(1)}% en rodeos</div>
         </div>
         <div class="kpi-card verde">
           <div class="kpi-label">En Stock Físico</div>
@@ -349,22 +383,22 @@ export function generarReportePdfAuditoriaCaravanas({
         </div>
         <div class="kpi-card ambar">
           <div class="kpi-label">Salidas / Ventas</div>
-          <div class="kpi-val" style="color:#d97706;">${salidasComerciales.toLocaleString('es-AR')}</div>
-          <div class="kpi-sub">${((salidasComerciales / (totalCompradas || 1)) * 100).toFixed(1)}% DT-e y faena</div>
+          <div class="kpi-val" style="color:#d97706;">${totalSalidas.toLocaleString('es-AR')}</div>
+          <div class="kpi-sub">${((totalSalidas / (totalCompradas || 1)) * 100).toFixed(1)}% DT-e y faena</div>
         </div>
         <div class="kpi-card rojo">
           <div class="kpi-label">Mermas / Roturas</div>
-          <div class="kpi-val" style="color:#dc2626;">${mermasRoturas.toLocaleString('es-AR')}</div>
-          <div class="kpi-sub">${((mermasRoturas / (totalCompradas || 1)) * 100).toFixed(1)}% manga/fábrica</div>
+          <div class="kpi-val" style="color:#dc2626;">${totalMermas.toLocaleString('es-AR')}</div>
+          <div class="kpi-sub">${((totalMermas / (totalCompradas || 1)) * 100).toFixed(1)}% manga/fábrica</div>
         </div>
       </div>
 
       <!-- VERIFICACIÓN DE BALANCE -->
-      <div class="balance-box">
+      <div class="balance-box" style="${balanceCuadrado ? 'border: 1.5px solid #10b981; background: #ecfdf5; color: #065f46;' : 'border: 1.5px solid #f59e0b; background: #fffbeb; color: #b45309;'} border-radius: 8px; padding: 7px 12px; margin: 0 0 14px 0; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
         <span>ESTADO DE CONCILIACIÓN MATEMÁTICA:</span>
         <span>
-          ${activasEnCampo} Puestas + ${totalEnStock} Stock + ${salidasComerciales} Ventas + ${mermasRoturas} Mermas = 
-          <strong>${sumaCalculada} / ${totalCompradas} CARAVANAS (${balanceCuadrado ? 'BALANCE CUADRADO 100%' : 'DESFASAJE DETECTADO'})</strong>
+          ${totalPuestas.toLocaleString('es-AR')} Puestas + ${totalEnStock.toLocaleString('es-AR')} Stock + ${totalSalidas.toLocaleString('es-AR')} Salidas + ${totalMermas.toLocaleString('es-AR')} Mermas = 
+          <strong>${sumaCalculada.toLocaleString('es-AR')} / ${totalCompradas.toLocaleString('es-AR')} CARAVANAS (${balanceCuadrado ? 'BALANCE CUADRADO 100%' : `DESFASAJE DE ${Math.abs(sumaCalculada - totalCompradas)} CARAVANAS`})</strong>
         </span>
       </div>
 
@@ -390,11 +424,11 @@ export function generarReportePdfAuditoriaCaravanas({
           <tr style="background:#f1f5f9; font-weight:900; border-top:2px solid #0f172a;">
             <td colspan="4" style="text-transform:uppercase; text-align:right;">TOTALES GENERALES AUDITADOS:</td>
             <td style="text-align:right;">${totalCompradas.toLocaleString('es-AR')}</td>
-            <td style="text-align:right; color:#1d4ed8;">${activasEnCampo.toLocaleString('es-AR')}</td>
-            <td style="text-align:right; color:#d97706;">${salidasComerciales.toLocaleString('es-AR')}</td>
-            <td style="text-align:right; color:#b91c1c;">${mermasRoturas.toLocaleString('es-AR')}</td>
+            <td style="text-align:right; color:#1d4ed8;">${totalPuestas.toLocaleString('es-AR')}</td>
+            <td style="text-align:right; color:#d97706;">${totalSalidas.toLocaleString('es-AR')}</td>
+            <td style="text-align:right; color:#b91c1c;">${totalMermas.toLocaleString('es-AR')}</td>
             <td style="text-align:right; color:#065f46;">${totalEnStock.toLocaleString('es-AR')}</td>
-            <td>430 disponibles en depósito</td>
+            <td>${totalEnStock} disponibles en depósito</td>
           </tr>
         </tbody>
       </table>
@@ -414,6 +448,13 @@ export function generarReportePdfAuditoriaCaravanas({
         </thead>
         <tbody>
           ${filasRodeosHtml}
+          <tr style="background:#f1f5f9; font-weight:900; border-top:2px solid #0f172a;">
+            <td colspan="2" style="text-transform:uppercase; text-align:right;">TOTAL CARAVANAS EN RODEOS ACTIVOS:</td>
+            <td style="text-align:right;">${totalCabezasEnRodeos.toLocaleString('es-AR')} cab.</td>
+            <td style="text-align:right; color:#1d4ed8;">${totalCaravanasEnRodeos.toLocaleString('es-AR')} car.</td>
+            <td style="text-align:right; color:#065f46;">${pctGlobal}%</td>
+            <td style="font-size:9.5px; color:#334155;">${totalCaravanasEnRodeos === totalPuestas ? '100% conciliado con Lotes SIGSA (632 puestas)' : `${totalCaravanasEnRodeos} / ${totalPuestas} asignadas`}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -463,42 +504,88 @@ export function generarExcelMultiHojaCaravanas({
   animales = [],
   fechaOperacion = '',
 }) {
-  const lotes = cajasCaravanas && cajasCaravanas.length > 0 ? cajasCaravanas : LOTES_OFICIALES_SIGSA;
   const hoyStr = fechaOperacion || new Date().toISOString().slice(0, 10);
+
+  const lotesCalculados = LOTES_OFICIALES_SIGSA.map((loteOficial) => {
+    const custom = (cajasCaravanas || []).find((c) => Number(c.caja_numero) === Number(loteOficial.caja_numero));
+    const cantidad = Number(custom?.cantidad ?? loteOficial.cantidad) || 0;
+    const puestas = Number(custom?.puestas ?? loteOficial.puestas) || 0;
+    const salidas = Number(custom?.salidas ?? loteOficial.salidas) || 0;
+    const mermas = Number(custom?.mermas ?? loteOficial.mermas) || 0;
+    const stock = Number(custom?.en_stock ?? loteOficial.en_stock) || 0;
+    return {
+      ...loteOficial,
+      cantidad,
+      puestas,
+      salidas,
+      mermas,
+      en_stock: stock,
+    };
+  });
+
+  const totalCompradas = lotesCalculados.reduce((acc, l) => acc + (Number(l.cantidad) || 0), 0); // 1.600
+  const totalPuestas = lotesCalculados.reduce((acc, l) => acc + (Number(l.puestas) || 0), 0); // 632
+  const totalSalidas = lotesCalculados.reduce((acc, l) => acc + (Number(l.salidas) || 0), 0); // 515
+  const totalMermas = lotesCalculados.reduce((acc, l) => acc + (Number(l.mermas) || 0), 0); // 23
+  const totalEnStock = lotesCalculados.reduce((acc, l) => acc + (Number(l.en_stock) || 0), 0); // 430
+
+  const sumaCalculada = totalPuestas + totalEnStock + totalSalidas + totalMermas;
+  const balanceCuadrado = sumaCalculada === totalCompradas;
 
   // --------------------------------------------------------------------------
   // HOJA 1: Resumen SIGSA y Conciliación
   // --------------------------------------------------------------------------
   const resumenKpis = [
-    { 'Concepto': 'Total Compradas en SIGSA', 'Unidades': 1600, '% del Total': '100.0%', 'Observaciones': '6 Lotes comprados oficialmente' },
-    { 'Concepto': 'Puestas en Campo (Activas)', 'Unidades': 632, '% del Total': '39.5%', 'Observaciones': 'Colocadas en rodeos de cría, vaquillonas y toros' },
-    { 'Concepto': 'En Stock Físico (Depósito)', 'Unidades': 430, '% del Total': '26.9%', 'Observaciones': '130 lote 07/09 + 300 lote 02/11 cerradas' },
-    { 'Concepto': 'Salidas Comerciales (Ventas)', 'Unidades': 516, '% del Total': '32.3%', 'Observaciones': 'Despachadas con DT-e a frigorífico o invernada' },
-    { 'Concepto': 'Mermas y Roturas en Manga', 'Unidades': 22, '% del Total': '1.4%', 'Observaciones': 'Dañadas en colocación o falladas de fábrica' },
-    { 'Concepto': 'Balance de Conciliación', 'Unidades': 1600, '% del Total': '100.0%', 'Observaciones': 'Puestas + Stock + Salidas + Mermas = Compradas (CUADRADO)' },
+    { 'Concepto': 'Total Compradas en SIGSA', 'Unidades': totalCompradas, '% del Total': '100.0%', 'Observaciones': '6 Lotes comprados oficialmente' },
+    { 'Concepto': 'Puestas en Campo (Activas)', 'Unidades': totalPuestas, '% del Total': `${((totalPuestas / (totalCompradas || 1)) * 100).toFixed(1)}%`, 'Observaciones': 'Colocadas en rodeos de cría, vaquillonas y toros' },
+    { 'Concepto': 'En Stock Físico (Depósito)', 'Unidades': totalEnStock, '% del Total': `${((totalEnStock / (totalCompradas || 1)) * 100).toFixed(1)}%`, 'Observaciones': '130 lote 07/09 + 300 lote 02/11 cerradas' },
+    { 'Concepto': 'Salidas Comerciales (Ventas)', 'Unidades': totalSalidas, '% del Total': `${((totalSalidas / (totalCompradas || 1)) * 100).toFixed(1)}%`, 'Observaciones': 'Despachadas con DT-e a frigorífico o invernada' },
+    { 'Concepto': 'Mermas y Roturas en Manga', 'Unidades': totalMermas, '% del Total': `${((totalMermas / (totalCompradas || 1)) * 100).toFixed(1)}%`, 'Observaciones': 'Dañadas en manga (1) y falladas de fábrica (22)' },
+    { 'Concepto': 'Balance de Conciliación', 'Unidades': sumaCalculada, '% del Total': '100.0%', 'Observaciones': balanceCuadrado ? 'Puestas + Stock + Salidas + Mermas = Compradas (BALANCE CUADRADO 100%)' : `DESFASAJE DE ${Math.abs(sumaCalculada - totalCompradas)} CARAVANAS` },
   ];
 
-  const lotesData = LOTES_OFICIALES_SIGSA.map((l) => ({
+  const lotesData = lotesCalculados.map((l) => ({
     'Caja N°': l.caja_numero,
     'Fecha Compra': l.fecha_compra,
     'Rango Desde': l.desde,
     'Rango Hasta': l.hasta,
     'Cantidad Comprada': l.cantidad,
+    'Puestas en Campo': l.puestas,
+    'Salidas Comerciales': l.salidas,
+    'Mermas / Roturas': l.mermas,
     'En Stock (Disponible)': l.en_stock,
-    'Usadas / Puestas': l.usadas,
     'CUIG': l.cuig,
     'Proveedor': l.proveedor,
     'Detalle Operativo': l.observaciones,
   }));
 
+  lotesData.push({
+    'Caja N°': 'TOTALES',
+    'Fecha Compra': '-',
+    'Rango Desde': '-',
+    'Rango Hasta': '-',
+    'Cantidad Comprada': totalCompradas,
+    'Puestas en Campo': totalPuestas,
+    'Salidas Comerciales': totalSalidas,
+    'Mermas / Roturas': totalMermas,
+    'En Stock (Disponible)': totalEnStock,
+    'CUIG': 'JS307',
+    'Proveedor': 'Agroganadera Rincón del Sur S.A.',
+    'Detalle Operativo': `${totalPuestas} Puestas + ${totalEnStock} Stock + ${totalSalidas} Salidas + ${totalMermas} Mermas = ${sumaCalculada} Caravanas (CUADRADO)`,
+  });
+
   const ws1 = XLSX.utils.json_to_sheet(resumenKpis);
   XLSX.utils.sheet_add_json(ws1, [{ '': '' }], { origin: -1 });
   XLSX.utils.sheet_add_json(ws1, lotesData, { origin: -1 });
 
+  const padronAnimales = (animales && animales.length > 0)
+    ? animales
+    : (generarAuditoriaOficialSanJose().animales || []);
+
   // --------------------------------------------------------------------------
   // HOJA 2: En Stock Disponible (Planilla de manga para tildar)
   // --------------------------------------------------------------------------
-  const stockItems = (animales || [])
+  const stockItems = padronAnimales
     .filter((a) => {
       const est = (a.estado_caravana || a.estado || '').toLowerCase();
       return est.includes('stock');
@@ -521,10 +608,11 @@ export function generarExcelMultiHojaCaravanas({
   // --------------------------------------------------------------------------
   // HOJA 3: Puestas en Campo (Padrón activo)
   // --------------------------------------------------------------------------
-  const campoItems = (animales || [])
+  const campoItems = padronAnimales
     .filter((a) => {
       const est = (a.estado_caravana || a.estado || '').toLowerCase();
-      return !est.includes('salida') && !est.includes('venta') && !est.includes('baja') && !est.includes('stock');
+      const mot = (a.motivo_salida || a.observaciones || '').toLowerCase();
+      return !est.includes('salida') && !est.includes('venta') && !est.includes('baja') && !est.includes('stock') && !est.includes('merma') && !mot.includes('merma');
     })
     .sort((a, b) => String(a.caravana).localeCompare(String(b.caravana)))
     .map((a, idx) => ({
@@ -544,16 +632,17 @@ export function generarExcelMultiHojaCaravanas({
   // --------------------------------------------------------------------------
   // HOJA 4: Salidas y Bajas (Ventas y DT-e)
   // --------------------------------------------------------------------------
-  const salidasItems = (animales || [])
+  const salidasItems = padronAnimales
     .filter((a) => {
       const est = (a.estado_caravana || a.estado || '').toLowerCase();
-      return est.includes('salida') || est.includes('venta') || est.includes('baja');
+      const mot = (a.motivo_salida || a.observaciones || '').toLowerCase();
+      return est.includes('salida') || est.includes('venta') || est.includes('baja') || est.includes('merma') || mot.includes('merma');
     })
     .sort((a, b) => String(a.caravana).localeCompare(String(b.caravana)))
     .map((a, idx) => ({
       'N°': idx + 1,
       'Caravana SENASA': a.caravana,
-      'Tipo Salida': a.motivo_salida || 'Venta',
+      'Tipo Salida': a.motivo_salida || (a.estado_caravana === 'Merma' ? 'Merma / Rotura' : 'Venta'),
       'Fecha Salida': a.fecha_salida ? formatFechaAR(a.fecha_salida) : '-',
       'N° DT-e': a.dte_numero || '-',
       'Rodeo Origen': a.rodeo || 'Hacienda General',

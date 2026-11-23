@@ -2060,7 +2060,7 @@ Datos en vivo de San José:
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Resumen consolidado de las 1.600 caravanas oficiales adquiridas ante SENASA/SIGSA por Establecimiento San José. Incluye verificación de balance cuadrado: <strong className="text-slate-800">632 puestas en campo + 430 en stock + 516 salidas + 22 mermas = 1.600 totales</strong>.
+              Resumen consolidado de las 1.600 caravanas oficiales adquiridas ante SENASA/SIGSA por Establecimiento San José. Incluye verificación de balance cuadrado: <strong className="text-slate-800">632 puestas en campo + 430 en stock + 515 salidas + 23 mermas = 1.600 totales</strong>.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
@@ -2081,12 +2081,12 @@ Datos en vivo de San José:
               </div>
               <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3">
                 <div className="text-[10px] font-bold uppercase text-amber-800">Salidas / Ventas</div>
-                <div className="text-lg font-black text-amber-950 mt-0.5">516 <span className="text-xs font-normal text-slate-400">un.</span></div>
-                <div className="text-[10px] font-bold text-amber-700 mt-0.5">32,3% con DT-e</div>
+                <div className="text-lg font-black text-amber-950 mt-0.5">515 <span className="text-xs font-normal text-slate-400">un.</span></div>
+                <div className="text-[10px] font-bold text-amber-700 mt-0.5">32,2% con DT-e</div>
               </div>
               <div className="bg-rose-50/70 border border-rose-200/80 rounded-xl p-3 col-span-2 sm:col-span-1">
                 <div className="text-[10px] font-bold uppercase text-rose-800">Mermas / Roturas</div>
-                <div className="text-lg font-black text-rose-950 mt-0.5">22 <span className="text-xs font-normal text-slate-400">un.</span></div>
+                <div className="text-lg font-black text-rose-950 mt-0.5">23 <span className="text-xs font-normal text-slate-400">un.</span></div>
                 <div className="text-[10px] font-bold text-rose-700 mt-0.5">1,4% descartadas</div>
               </div>
             </div>

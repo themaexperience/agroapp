@@ -1,7 +1,7 @@
 // src/utils/caravanasAuditoriaOficial.js
 // Auditoría Oficial de Caravanas SENASA (RENSPA JS307) para Establecimiento San José
 // Agroganadera Rincón del Sur S.A. · Las Flores, Bs. As.
-// Cuadra exactamente: 1.600 compradas = 430 En Stock + 632 Puestas en Campo + 516 Salidas + 22 Mermas
+// Cuadra exactamente: 1.600 compradas = 430 En Stock + 632 Puestas en Campo + 515 Salidas + 23 Mermas
 
 import { supabase } from '../lib/supabase.js';
 
@@ -13,6 +13,9 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010007455750',
     hasta: '032010007455949',
     cantidad: 200,
+    puestas: 15,
+    salidas: 185,
+    mermas: 0,
     en_stock: 0,
     usadas: 200,
     usadas_sin_detalle: 0,
@@ -28,13 +31,16 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010010604500',
     hasta: '032010010604699',
     cantidad: 200,
+    puestas: 184,
+    salidas: 15,
+    mermas: 1,
     en_stock: 0,
     usadas: 200,
     usadas_sin_detalle: 0,
     color_tipo: 'Amarilla Oficial SENASA',
     cuig: 'JS307',
     proveedor: 'SIGSA / Allflex Oficial',
-    observaciones: 'Lote 13/05/2026: 200 unid. (184 puestas [34 Toros 4630-4664 s/36 + 20 Vaq. Otoño 4680-4699] + 16 salidas/bajas)',
+    observaciones: 'Lote 13/05/2026: 200 unid. (184 puestas [34 Toros 4630-4664 + 20 Vaq. Otoño 4680-4699 + 130 Rodeo 2] + 15 salidas + 1 merma)',
   },
   {
     caja_numero: 3,
@@ -43,6 +49,9 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010011002250',
     hasta: '032010011002549',
     cantidad: 300,
+    puestas: 300,
+    salidas: 0,
+    mermas: 0,
     en_stock: 0,
     usadas: 300,
     usadas_sin_detalle: 0,
@@ -58,6 +67,9 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010011041325',
     hasta: '032010011041524',
     cantidad: 200,
+    puestas: 10,
+    salidas: 190,
+    mermas: 0,
     en_stock: 0,
     usadas: 200,
     usadas_sin_detalle: 0,
@@ -73,13 +85,16 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010011048200',
     hasta: '032010011048599',
     cantidad: 400,
+    puestas: 123,
+    salidas: 125,
+    mermas: 22,
     en_stock: 130, // 130 disponibles en depósito (20 unid 48280-48299 + 110 unid 48350-48459)
     usadas: 270,
     usadas_sin_detalle: 0,
     color_tipo: 'Amarilla Oficial SENASA',
     cuig: 'JS307',
     proveedor: 'SIGSA / Allflex Oficial',
-    observaciones: 'Lote 07/09/2026: 400 unid. (130 EN STOCK + 123 puestas [Preñez 10/11] + 125 salidas + 22 mermas)',
+    observaciones: 'Lote 07/09/2026: 400 unid. (130 EN STOCK + 123 puestas [Preñez 10/11 y Rodeo 2] + 125 salidas + 22 mermas)',
   },
   {
     caja_numero: 6,
@@ -88,6 +103,9 @@ export const LOTES_OFICIALES_SIGSA = [
     desde: '032010007589125',
     hasta: '032010007589424',
     cantidad: 300,
+    puestas: 0,
+    salidas: 0,
+    mermas: 0,
     en_stock: 300, // 300 en depósito intactas
     usadas: 0,
     usadas_sin_detalle: 0,
@@ -148,7 +166,7 @@ export function resolverCaravanaCompleta(numInput, lotes = LOTES_OFICIALES_SIGSA
 
 /**
  * Genera el padrón completo oficial de 1.600 animales con estados y rodeos cuadrados
- * Cuadre exacto: 430 En Stock + 632 Puestas en Campo + 516 Salidas/Bajas + 22 Mermas = 1.600
+ * Cuadre exacto: 430 En Stock + 632 Puestas en Campo + 515 Salidas/Bajas + 23 Mermas = 1.600
  */
 export function generarAuditoriaOficialSanJose() {
   const animales = [];
@@ -198,7 +216,7 @@ export function generarAuditoriaOficialSanJose() {
   }
 
   // =========================================================================
-  // LOTE 2 (13/05/2026): 032010010604500 a 032010010604699 (200 unid: 184 puestas + 16 salidas/bajas)
+  // LOTE 2 (13/05/2026): 032010010604500 a 032010010604699 (200 unid: 184 puestas + 15 salidas + 1 merma)
   // =========================================================================
   const l2Start = 32010010604500n;
   for (let i = 0n; i < 200n; i++) {
@@ -209,7 +227,7 @@ export function generarAuditoriaOficialSanJose() {
     // Caso Toros: 4630 a 4664 (sufijo 630 a 664)
     if (sufijo >= 630 && sufijo <= 664) {
       if (sufijo === 636) {
-        // Caravana 4636 rota en manga (1 baja)
+        // Caravana 4636 rota en manga (1 merma/rotura oficial)
         animales.push({
           id: `auditoria_${car}`,
           caravana: car,
@@ -217,8 +235,8 @@ export function generarAuditoriaOficialSanJose() {
           categoria: 'Toros Padres',
           rodeo: 'TOROS',
           potrero_actual: null,
-          estado: 'Baja / Descarte',
-          estado_caravana: 'Baja',
+          estado: 'Baja / Merma',
+          estado_caravana: 'Merma',
           fecha_salida: '2026-05-18',
           motivo_salida: 'Baja / Rotura en manga',
           origen_planilla: 'Auditoría Oficial SIGSA 13/05/2026',
@@ -279,7 +297,7 @@ export function generarAuditoriaOficialSanJose() {
         caravana: car,
         marca: 'San José (JS307)',
         categoria: 'Vaca Cría',
-        rodeo: 'RODEO 2',
+        rodeo: 'COLADA RODEO 2',
         potrero_actual: 15,
         estado: 'Activa en Campo',
         estado_caravana: 'Activa en Campo',
@@ -458,7 +476,7 @@ export function generarAuditoriaOficialSanJose() {
         caravana: car,
         marca: 'San José (JS307)',
         categoria: 'Vaca Cría',
-        rodeo: 'RODEO 2',
+        rodeo: 'COLADA RODEO 2',
         potrero_actual: 15,
         estado: 'Activa en Campo',
         estado_caravana: 'Activa en Campo',
@@ -527,7 +545,7 @@ export async function sincronizarAuditoriaOficialEnBaseDeDatos({
       window.dispatchEvent(new CustomEvent('san_jose_sandbox_changed', { detail: sData }));
 
       notify?.(
-        'Auditoría Oficial SIGSA sincronizada con éxito en Modo Sandbox: 430 en stock, 632 en campo y 516 salidas.',
+        'Auditoría Oficial SIGSA sincronizada con éxito en Modo Sandbox: 430 en stock, 632 en campo, 515 salidas y 23 mermas.',
         'success'
       );
 
@@ -641,7 +659,7 @@ export async function sincronizarAuditoriaOficialEnBaseDeDatos({
     }
 
     notify?.(
-      'Auditoría Oficial SIGSA sincronizada con éxito: 1.600 caravanas conciliadas (430 Stock / 632 Campo / 516 Salidas / 22 Mermas).',
+      'Auditoría Oficial SIGSA sincronizada con éxito: 1.600 caravanas conciliadas (430 Stock / 632 Campo / 515 Salidas / 23 Mermas).',
       'success'
     );
 

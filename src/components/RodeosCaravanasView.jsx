@@ -467,7 +467,7 @@ export default function RodeosCaravanasView({
 
     const conf = await confirmAction({
       title: '¿Sincronizar Auditoría Oficial SIGSA?',
-      description: `Se sincronizará el universo oficial de 1.600 caravanas (430 En Stock, 632 En Campo, 516 Salidas/Bajas, 22 Mermas). Operando en ${isSandboxMode ? 'MODO SANDBOX' : 'PRODUCCIÓN SUPABASE'}. Se realizará una limpieza previa de datos desfasados para cuadre exacto.`,
+      description: `Se sincronizará el universo oficial de 1.600 caravanas (430 En Stock, 632 En Campo, 515 Salidas/Bajas, 23 Mermas). Operando en ${isSandboxMode ? 'MODO SANDBOX' : 'PRODUCCIÓN SUPABASE'}. Se realizará una limpieza previa de datos desfasados para cuadre exacto.`,
       confirmText: 'Sí, sincronizar auditoría',
       variant: 'warning',
     });
@@ -552,17 +552,20 @@ export default function RodeosCaravanasView({
         .map(a => a.rodeo)
     ).size;
 
+    const isMerma = (a) => {
+      const est = (a.estado_caravana || a.estado || '').toLowerCase();
+      const mot = (a.motivo_salida || a.observaciones || '').toLowerCase();
+      return est.includes('merma') || est.includes('rotura') || mot.includes('merma') || mot.includes('rotur') || mot.includes('fábrica') || mot.includes('fabrica');
+    };
+
     const salidas = (animales || []).filter(a => {
       const est = (a.estado_caravana || a.estado || '').toLowerCase();
       if (est.includes('stock') || est.includes('deposito') || est.includes('depósito')) return false;
-      if (est.includes('merma') || est.includes('rotura')) return false;
+      if (isMerma(a)) return false;
       return est.includes('salida') || est.includes('venta') || est.includes('despacho') || est.includes('d-te') || est.includes('muert') || est.includes('baja');
     }).length;
 
-    const mermas = (animales || []).filter(a => {
-      const est = (a.estado_caravana || a.estado || '').toLowerCase();
-      return est.includes('merma') || est.includes('rotura');
-    }).length;
+    const mermas = (animales || []).filter(isMerma).length;
 
     return { enStock, cajasCount, cajasConStock, puestas, totalVigentes, rodeosConCaravanas, salidas, mermas };
   }, [cajasCaravanas, animales]);
@@ -921,11 +924,12 @@ export default function RodeosCaravanasView({
   // Conteo de caravanas individuales activas vinculadas a cada Rodeo (tanto por rodeo_id como por rodeo.nombre)
   const caravanasPorRodeo = useMemo(() => {
     const counts = {};
-    const norm = (s) => (s ? String(s).trim().toUpperCase() : '');
+    const norm = (s) => (s ? String(s).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '');
 
     const esActiva = (a) => {
       if (!a) return false;
       const est = String(a.estado_caravana || a.estado || 'En campo').toLowerCase().trim();
+      const mot = String(a.motivo_salida || a.observaciones || '').toLowerCase().trim();
       if (est.includes('stock') || est.includes('deposito') || est.includes('depósito')) return false;
       if (
         est === 'baja' ||
@@ -941,7 +945,9 @@ export default function RodeosCaravanasView({
         est.includes('merma') ||
         est.includes('rotura') ||
         est.includes('despacho') ||
-        est.includes('d-te')
+        est.includes('d-te') ||
+        mot.includes('merma') ||
+        mot.includes('rotur')
       ) {
         return false;
       }
@@ -950,6 +956,24 @@ export default function RodeosCaravanasView({
 
     const activas = (animales || []).filter(esActiva);
 
+    const matchesRodeo = (aNom, rNom) => {
+      if (!aNom || !rNom) return false;
+      if (aNom === rNom) return true;
+      const isR2 = (s) => s.includes('RODEO 2') || s.includes('COLADA 2') || s === 'RODEO 2';
+      if (isR2(aNom) && isR2(rNom)) return true;
+      const isToro = (s) => s.includes('TORO');
+      if (isToro(aNom) && isToro(rNom)) return true;
+      const isVaq = (s) => s.includes('VAQUILLONA') || s.includes('OTONO');
+      if (isVaq(aNom) && isVaq(rNom)) return true;
+      const isPunta = (s) => s.includes('PUNTA') || s.includes('RODEO 1');
+      if (isPunta(aNom) && isPunta(rNom)) return true;
+      const isR3 = (s) => s.includes('RODEO 3');
+      if (isR3(aNom) && isR3(rNom)) return true;
+      const isCola = (s) => s.includes('COLA');
+      if (isCola(aNom) && isCola(rNom)) return true;
+      return false;
+    };
+
     (rodeos || []).forEach((rodeo) => {
       const rId = rodeo.id != null ? String(rodeo.id) : null;
       const rNom = norm(rodeo.nombre);
@@ -957,12 +981,12 @@ export default function RodeosCaravanasView({
       const total = activas.filter((a) => {
         if (rId && a.rodeo_id != null && String(a.rodeo_id) === rId) return true;
         const aNom = norm(a.rodeo || a.rodeo_asignado || a.rodeo_nombre);
-        if (rNom && aNom && aNom === rNom) return true;
-        return false;
+        return matchesRodeo(aNom, rNom);
       }).length;
 
       if (rId) counts[rId] = total;
       if (rNom) counts[rNom] = total;
+      if (rodeo.nombre) counts[(rodeo.nombre || '').trim().toUpperCase()] = total;
     });
 
     return counts;
@@ -7427,13 +7451,13 @@ export default function RodeosCaravanasView({
                         }}
                         disabled={syncingAuditoria}
                         className="w-full text-left px-3.5 py-2.5 hover:bg-amber-50 text-amber-950 font-bold flex items-center gap-2.5 transition cursor-pointer disabled:opacity-50"
-                        title="Sincronizar universo de 1.600 caravanas (430 Stock / 632 Campo / 516 Salidas)"
+                        title="Sincronizar universo de 1.600 caravanas (430 Stock / 632 Campo / 515 Salidas / 23 Mermas)"
                       >
                         <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
                         <span className="leading-tight">
                           {syncingAuditoria
                             ? '⏳ Sincronizando auditoría oficial...'
-                            : '✨ Sincronizar Auditoría Oficial SIGSA (430 Stock / 632 Campo / 516 Salidas)'}
+                            : '✨ Sincronizar Auditoría Oficial SIGSA (430 Stock / 632 Campo / 515 Salidas / 23 Mermas)'}
                         </span>
                       </button>
                     </div>
