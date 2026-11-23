@@ -232,125 +232,6 @@ export function calcResumenRodeosOficial(rodeos = [], editedRodeos = {}) {
   };
 }
 
-// =========================================================================
-// SUBCOMPONENTE REUTILIZABLE: STEPPER TÁCTIL PARA ANIMALES [ - | N | + ]
-// =========================================================================
-export function AnimalStepperInput({
-  value = 0,
-  onChange,
-  onBlur,
-  disabled = false,
-  min = 0,
-  max = 99999,
-  step = 1,
-  colorTheme = 'slate', // 'slate' | 'sky' | 'rose' | 'emerald' | 'purple' | 'amber'
-  inputWidth = 'w-11', // 'w-10' | 'w-11' | 'w-12'
-  className = '',
-  title = '',
-  ariaLabel = '',
-}) {
-  const numVal = parseInt(value, 10) || 0;
-
-  const handleStep = (delta) => {
-    if (disabled) return;
-    const next = Math.max(min, Math.min(max, numVal + delta));
-    onChange?.(next);
-  };
-
-  const handleInputChange = (e) => {
-    const raw = e.target.value;
-    if (raw === '') {
-      onChange?.('');
-      return;
-    }
-    const parsed = parseInt(raw, 10);
-    if (!isNaN(parsed)) {
-      onChange?.(Math.max(min, Math.min(max, parsed)));
-    }
-  };
-
-  const themeStyles = {
-    slate: {
-      border: 'border-slate-300 hover:border-slate-400 focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-400',
-      text: 'text-slate-900',
-      btn: 'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 border-slate-200',
-    },
-    emerald: {
-      border: 'border-emerald-500 hover:border-emerald-600 focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-500 ring-1 ring-emerald-500/20',
-      text: 'text-emerald-950 font-black',
-      btn: 'bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border-emerald-200',
-    },
-    sky: {
-      border: 'border-sky-300 hover:border-sky-400 focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-400',
-      text: 'text-sky-950',
-      btn: 'bg-sky-50 hover:bg-sky-100 active:bg-sky-200 text-sky-800 border-sky-200',
-    },
-    rose: {
-      border: 'border-rose-300 hover:border-rose-400 focus-within:border-rose-500 focus-within:ring-1 focus-within:ring-rose-400',
-      text: 'text-rose-950',
-      btn: 'bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-800 border-rose-200',
-    },
-    purple: {
-      border: 'border-purple-300 hover:border-purple-400 focus-within:border-purple-500 focus-within:ring-1 focus-within:ring-purple-400',
-      text: 'text-purple-950',
-      btn: 'bg-purple-50 hover:bg-purple-100 active:bg-purple-200 text-purple-800 border-purple-200',
-    },
-    amber: {
-      border: 'border-amber-300 hover:border-amber-400 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-400',
-      text: 'text-amber-950',
-      btn: 'bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border-amber-200',
-    },
-  };
-
-  const theme = themeStyles[colorTheme] || themeStyles.slate;
-  const isMin = numVal <= min;
-
-  return (
-    <div
-      title={title}
-      className={`inline-flex items-center rounded-lg border overflow-hidden shadow-xs transition-colors ${theme.border} ${
-        disabled ? 'opacity-80 bg-slate-50/90 cursor-not-allowed' : 'bg-white'
-      } ${className}`}
-    >
-      <button
-        type="button"
-        disabled={disabled || isMin}
-        onClick={() => handleStep(-step)}
-        aria-label={`Restar ${ariaLabel || ''}`}
-        tabIndex={-1}
-        className={`w-6 h-8 flex items-center justify-center font-bold text-sm select-none border-r transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-slate-100 ${theme.btn}`}
-      >
-        −
-      </button>
-
-      <input
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={value ?? 0}
-        disabled={disabled}
-        onChange={handleInputChange}
-        onBlur={onBlur}
-        aria-label={ariaLabel}
-        className={`${inputWidth} h-8 text-center font-bold tabular-nums text-sm bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${theme.text} ${
-          disabled ? 'cursor-not-allowed text-slate-500' : ''
-        }`}
-      />
-
-      <button
-        type="button"
-        disabled={disabled || numVal >= max}
-        onClick={() => handleStep(step)}
-        aria-label={`Sumar ${ariaLabel || ''}`}
-        tabIndex={-1}
-        className={`w-6 h-8 flex items-center justify-center font-bold text-sm select-none border-l transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-slate-100 ${theme.btn}`}
-      >
-        +
-      </button>
-    </div>
-  );
-}
 
 function mapRawRowToAnimal(row, index, sheetName) {
   const keys = Object.keys(row);
@@ -703,25 +584,9 @@ export default function RodeosCaravanasView({
   const [bulkPotrero, setBulkPotrero] = useState('');
   const [targetRodeoForLink, setTargetRodeoForLink] = useState(null); // Rodeo preseleccionado desde la planilla
 
-  // Modo Lectura vs Modo Edición para evitar toques accidentales de steppers durante el scroll
-  const [globalEditMode, setGlobalEditMode] = useState(false);
-  const [editingRodeoIds, setEditingRodeoIds] = useState(new Set());
+  // Drawer lateral derecho de edición de rodeo
   const [editingRodeoDrawer, setEditingRodeoDrawer] = useState(null);
   const [savingRodeoDrawer, setSavingRodeoDrawer] = useState(false);
-
-  const isRodeoEditing = useCallback(
-    (id) => globalEditMode || editingRodeoIds.has(id),
-    [globalEditMode, editingRodeoIds]
-  );
-
-  const toggleRodeoEdit = useCallback((id) => {
-    setEditingRodeoIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
 
   // Estados de Snapshots y Línea de Tiempo de Cortes de Planilla
   const [snapshots, setSnapshots] = useState([]);
@@ -849,7 +714,7 @@ export default function RodeosCaravanasView({
       rodeos.forEach((r) => {
         // REGLA 2: Si la fila está en edición o tiene guardado en vuelo (dirtyRows),
         // está TERMINANTEMENTE PROHIBIDO sobreescribir los valores locales.
-        if (dirtyRowsRef.current.has(r.id) || editingRodeoIds.has(r.id) || globalEditMode || (editingRodeoDrawer && editingRodeoDrawer.id === r.id)) {
+        if (dirtyRowsRef.current.has(r.id) || (editingRodeoDrawer && editingRodeoDrawer.id === r.id)) {
           return;
         }
 
@@ -5854,7 +5719,6 @@ export default function RodeosCaravanasView({
                   {rodeosRender.map((r, rIdx) => {
                     const edit = editedRodeos[r.id] || r;
                     const rowTotal = calcTotalRodeoRow(edit);
-                    const isEditing = isRodeoEditing(r.id);
                     const countCaravanas =
                       (edit.id != null && caravanasPorRodeo[String(edit.id)] != null)
                         ? caravanasPorRodeo[String(edit.id)]
@@ -6012,19 +5876,14 @@ export default function RodeosCaravanasView({
                           </div>
                         </td>
 
-                        {/* 1.bis Rol Protocolo */}
+                        {/* 1.bis Rol Protocolo (Modo Lectura Limpio) */}
                         <td className="p-1 min-w-[95px] max-w-[105px] align-middle">
-                          <select
-                            value={edit.rol_protocolo || inferirRolProtocolo(edit)}
-                            onChange={(e) => updateRodeoField(r.id, 'rol_protocolo', e.target.value, true)}
-                            className="w-full px-1.5 py-1 rounded border border-slate-300 bg-white font-extrabold text-[10px] text-slate-800"
+                          <span
+                            className="inline-block w-full text-center px-1.5 py-1 rounded-md bg-slate-100 border border-slate-200/90 font-extrabold text-[10px] text-slate-800 truncate"
+                            title={edit.rol_protocolo || inferirRolProtocolo(edit)}
                           >
-                            {ROLES_PROTOCOLO.map((rol) => (
-                              <option key={rol} value={rol}>
-                                {rol}
-                              </option>
-                            ))}
-                          </select>
+                            {edit.rol_protocolo || inferirRolProtocolo(edit)}
+                          </span>
                         </td>
 
                         {/* 2. Potrero + Días Permanencia + Hectáreas */}
@@ -6344,7 +6203,6 @@ export default function RodeosCaravanasView({
               {rodeosRender.map((r) => {
                 const edit = editedRodeos[r.id] || r;
                 const rowTotal = calcTotalRodeoRow(edit);
-                const isEditing = isRodeoEditing(r.id);
                 const countCaravanas =
                   (edit.id != null && caravanasPorRodeo[String(edit.id)] != null)
                     ? caravanasPorRodeo[String(edit.id)]
