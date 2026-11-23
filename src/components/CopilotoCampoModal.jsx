@@ -1885,18 +1885,18 @@ export default function CopilotoCampoModal({
         </div>
 
         {/* Selector de Vistas del Copiloto IA: Chat / Protocolo / Recorrida */}
-        <div className="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex items-center justify-between gap-1.5 shrink-0">
-          <div className="inline-flex rounded-xl bg-slate-800/90 p-0.5 border border-slate-700/80 text-[11px] font-bold w-full">
+        <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between gap-1.5 shrink-0">
+          <div className="inline-flex rounded-xl bg-slate-200/70 p-0.5 border border-slate-300 text-[11px] font-bold w-full">
             <button
               type="button"
               onClick={() => setSubVista('chat')}
               className={`flex-1 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
                 subVista === 'chat'
-                  ? 'bg-emerald-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Bot className="w-3.5 h-3.5" />
+              <Bot className="w-3.5 h-3.5 text-emerald-600" />
               <span>Chat Asesor</span>
             </button>
             <button
@@ -1904,11 +1904,11 @@ export default function CopilotoCampoModal({
               onClick={() => setSubVista('protocolo')}
               className={`flex-1 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
                 subVista === 'protocolo'
-                  ? 'bg-emerald-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5" />
+              <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
               <span>Protocolo & Sabiduría</span>
             </button>
             <button
@@ -1916,11 +1916,11 @@ export default function CopilotoCampoModal({
               onClick={() => setSubVista('recorrida')}
               className={`flex-1 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 ${
                 subVista === 'recorrida'
-                  ? 'bg-emerald-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <FileText className="w-3.5 h-3.5" />
+              <FileText className="w-3.5 h-3.5 text-emerald-600" />
               <span>Informe Recorrida</span>
             </button>
           </div>
@@ -1931,8 +1931,8 @@ export default function CopilotoCampoModal({
           <div
             className={`p-2.5 px-4 text-xs font-bold flex items-center justify-between border-b ${
               testResult.ok
-                ? 'bg-emerald-950 text-emerald-200 border-emerald-800'
-                : 'bg-red-950 text-red-200 border-red-800'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
             }`}
           >
             <div className="flex items-center gap-2">

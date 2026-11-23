@@ -2737,11 +2737,11 @@ export default function SiembrasView({
       {/* MODAL 4: ASENTAR GASTO EN FINANZAS                                       */}
       {/* ========================================================================= */}
       {modalGastoOpen && gastoItemToRecord && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <DollarSign className="w-5 h-5 text-amber-400" />
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <DollarSign className="w-5 h-5 text-amber-600" />
                 <span>Asentar Gasto en Finanzas</span>
               </div>
               <button
@@ -2750,35 +2750,35 @@ export default function SiembrasView({
                   setModalGastoOpen(false);
                   setGastoItemToRecord(null);
                 }}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-600">
               ¿Deseás asentar este insumo como egreso en el módulo de{' '}
-              <strong className="text-white">Finanzas / Gastos</strong>?
+              <strong className="text-slate-900">Finanzas / Gastos</strong>?
             </p>
 
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-400">Producto:</span>
-                <span className="font-bold text-emerald-400">{gastoItemToRecord.item.producto}</span>
+                <span className="text-slate-500">Producto:</span>
+                <span className="font-bold text-emerald-800">{gastoItemToRecord.item.producto}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Cantidad:</span>
-                <span className="text-white">
+                <span className="text-slate-500">Cantidad:</span>
+                <span className="text-slate-900 font-semibold tabular-nums">
                   {gastoItemToRecord.item.cantidad} {gastoItemToRecord.item.unidad || 'L'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Lote Asignado:</span>
-                <span className="text-white">Potrero #{gastoItemToRecord.siembra.potrero_numero}</span>
+                <span className="text-slate-500">Lote Asignado:</span>
+                <span className="text-slate-900 font-semibold">Potrero #{gastoItemToRecord.siembra.potrero_numero}</span>
               </div>
-              <div className="flex justify-between border-t border-slate-800 pt-2 font-bold">
-                <span className="text-slate-300">Monto:</span>
-                <span className="text-amber-400 font-mono">
+              <div className="flex justify-between border-t border-slate-200 pt-2 font-bold">
+                <span className="text-slate-700">Monto:</span>
+                <span className="text-amber-700 font-mono tabular-nums">
                   USD ${Number(gastoItemToRecord.item.costo_usd || 0).toLocaleString('es-AR')} (~$
                   {Math.round(
                     Number(gastoItemToRecord.item.costo_usd || 0) * (Number(dolarRef) || 1540)
@@ -2795,7 +2795,7 @@ export default function SiembrasView({
                   setModalGastoOpen(false);
                   setGastoItemToRecord(null);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition shadow-2xs"
               >
                 Cancelar
               </button>
@@ -2804,7 +2804,7 @@ export default function SiembrasView({
                 onClick={() =>
                   handleConfirmRecordExpense(gastoItemToRecord.item, gastoItemToRecord.siembra)
                 }
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-md flex items-center gap-1.5 cursor-pointer transition"
               >
                 <Check className="w-4 h-4" />
                 <span>Confirmar y Asentar Gasto</span>
@@ -3726,7 +3726,7 @@ function SiembraEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       {/* Input oculto para escaneo IA */}
       <input
         type="file"
@@ -3736,23 +3736,23 @@ function SiembraEditModal({
         className="hidden"
       />
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full my-auto shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full my-auto shadow-2xl flex flex-col max-h-[92vh] text-slate-900">
         {/* Header Modal */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/60 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/90 rounded-t-2xl">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
               <Sprout className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{form.id ? 'Editar Ficha de Siembra & Labores' : 'Registrar Nueva Siembra / Lote'}</span>
                 {isMultiPotrero && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
                     Multi-Potrero ({selectedPotreros.length} lotes · {totHaActual.toFixed(1)} ha)
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Calculadora agronómica por fila, conversión de envases, labores de contratista y sincronización de costos.
               </p>
             </div>
@@ -3760,7 +3760,7 @@ function SiembraEditModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -3768,24 +3768,24 @@ function SiembraEditModal({
 
         {/* Spinner de procesamiento IA */}
         {scanLoading && (
-          <div className="bg-emerald-950/80 border-b border-emerald-500/40 px-6 py-2.5 flex items-center gap-3 animate-pulse">
-            <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
-            <span className="text-xs text-emerald-200 font-semibold">{scanMsg || 'Interpretando con Gemini 2.5 Pro...'}</span>
+          <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2.5 flex items-center gap-3 animate-pulse">
+            <RefreshCw className="w-4 h-4 text-emerald-700 animate-spin" />
+            <span className="text-xs text-emerald-900 font-semibold">{scanMsg || 'Interpretando con Gemini 2.5 Pro...'}</span>
           </div>
         )}
 
         {/* Cuerpo Scrolleable */}
-        <div className="p-6 overflow-y-auto space-y-6 text-xs">
+        <div className="p-6 overflow-y-auto space-y-6 text-xs bg-slate-50/30">
           {/* SECCIÓN 1: Identificación y Superficie del Lote */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
                 <span>1. Identificación y Superficie del Lote</span>
               </h4>
 
               {/* Toggle Multi-Potrero */}
-              <label className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700 cursor-pointer hover:border-emerald-500 transition">
+              <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-300 cursor-pointer hover:border-emerald-600 transition">
                 <input
                   type="checkbox"
                   checked={isMultiPotrero}
@@ -3803,9 +3803,9 @@ function SiembraEditModal({
                       ]);
                     }
                   }}
-                  className="rounded text-emerald-500 focus:ring-emerald-400 h-3.5 w-3.5"
+                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                 />
-                <span className="text-[11px] font-bold text-slate-200">
+                <span className="text-[11px] font-bold text-slate-700">
                   🌿 Operación Multi-Potrero (Varios lotes con misma receta)
                 </span>
               </label>
@@ -3813,12 +3813,12 @@ function SiembraEditModal({
 
             {/* Selector Multi-Potrero o Potrero Único */}
             {isMultiPotrero ? (
-              <div className="p-3 bg-slate-900/90 rounded-xl border border-emerald-500/30 space-y-3">
+              <div className="p-3 bg-slate-50/80 rounded-xl border border-emerald-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-300">
+                  <span className="text-[11px] font-bold text-emerald-900">
                     Seleccioná los potreros incluidos y ajustá las hectáreas de cada uno:
                   </span>
-                  <span className="text-xs font-black text-white font-mono bg-emerald-950 px-2.5 py-1 rounded border border-emerald-800">
+                  <span className="text-xs font-black text-emerald-950 font-mono bg-emerald-50 px-2.5 py-1 rounded border border-emerald-300">
                     Total Conjunto: {selectedPotreros.length} potreros · {totHaActual.toFixed(1)} ha
                   </span>
                 </div>
@@ -3835,7 +3835,7 @@ function SiembraEditModal({
                         isSelected={isSelected}
                         onToggle={() => handleTogglePotrero(p)}
                         selectionType="checkbox"
-                        theme="dark"
+                        theme="light"
                         size="compact"
                       />
                     );
@@ -3843,30 +3843,30 @@ function SiembraEditModal({
                 </div>
 
                 {/* Desglose de hectáreas por potrero seleccionado */}
-                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 space-y-2">
-                  <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
                     Lotes incluidos en la operación:
                   </div>
                   <div className="flex flex-wrap gap-2.5">
                     {selectedPotreros.map((sp) => (
                       <div
                         key={sp.numero}
-                        className="flex items-center gap-2 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700"
+                        className="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-300"
                       >
-                        <span className="font-extrabold text-white text-xs">P#{sp.numero}</span>
+                        <span className="font-extrabold text-slate-800 text-xs">P#{sp.numero}</span>
                         <StepperInput
                           value={sp.hectareas}
                           onChange={(val) => handlePotreroHaEdit(sp.numero, val)}
                           step={0.5}
                           min={0.1}
                           className="w-24"
-                          inputClassName="text-xs text-emerald-400 py-0.5 px-1"
+                          inputClassName="text-xs text-emerald-700 py-0.5 px-1 font-bold"
                         />
-                        <span className="text-[10px] text-slate-400">ha</span>
+                        <span className="text-[10px] text-slate-500 font-medium">ha</span>
                         <button
                           type="button"
                           onClick={() => handleTogglePotrero({ numero: sp.numero })}
-                          className="text-slate-500 hover:text-rose-400 ml-0.5 cursor-pointer"
+                          className="text-slate-400 hover:text-rose-600 ml-0.5 cursor-pointer font-bold"
                           title="Quitar potrero"
                         >
                           ✕
@@ -3879,11 +3879,11 @@ function SiembraEditModal({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Potrero / Lote</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Potrero / Lote</label>
                   <select
                     value={form.potrero_numero}
                     onChange={(e) => handlePotreroChange(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   >
                     {potreros.map((p) => (
                       <option key={p.numero} value={p.numero}>
@@ -3895,9 +3895,9 @@ function SiembraEditModal({
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-semibold text-slate-300">Sup. Sembrada (ha)</label>
+                    <label className="text-[11px] font-semibold text-slate-700">Sup. Sembrada (ha)</label>
                     {esParcialModal && (
-                      <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-500/40">
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
                         Parcial ({currentPotreroHa.toFixed(1)} ha tot)
                       </span>
                     )}
@@ -3913,11 +3913,11 @@ function SiembraEditModal({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Vigencia en Mapa</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Vigencia en Mapa</label>
                   <select
                     value={form.vigencia || 'Activa'}
                     onChange={(e) => setForm({ ...form, vigencia: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   >
                     <option value="Activa">🌱 Activa (Impacta en Mapa)</option>
                     <option value="Pasada / Histórica">📜 Pasada / Histórica (Archivo)</option>
@@ -3925,11 +3925,11 @@ function SiembraEditModal({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Campaña</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Campaña</label>
                   <select
                     value={form.campana}
                     onChange={(e) => setForm({ ...form, campana: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                   >
                     {CAMPANAS_DISPONIBLES.map((c) => (
                       <option key={c} value={c}>
@@ -3944,7 +3944,7 @@ function SiembraEditModal({
             {/* Fila 2 de Datos Generales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
               <div ref={cultivoDropdownRef} className="relative">
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Cultivo / Pastura</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Cultivo / Pastura</label>
                 <div className="relative flex items-center">
                   <input
                     type="text"
@@ -3963,7 +3963,7 @@ function SiembraEditModal({
                       setForm((prev) => ({ ...prev, cultivo_variedad: e.target.value }));
                     }}
                     placeholder="Seleccionar o escribir cultivo / pastura..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-16 py-2 text-white font-semibold text-xs sm:text-sm placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full bg-white border border-slate-300 rounded-xl pl-3 pr-16 py-2 text-slate-900 font-semibold text-xs sm:text-sm placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 transition"
                   />
                   <div className="absolute right-1.5 flex items-center gap-0.5">
                     {form.cultivo_variedad && (
@@ -3975,7 +3975,7 @@ function SiembraEditModal({
                           setIsTypingCultivo(false);
                           setShowCultivoDropdown(true);
                         }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                         title="Borrar texto"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -3988,12 +3988,12 @@ function SiembraEditModal({
                         setIsTypingCultivo(false);
                         setShowCultivoDropdown((prev) => !prev);
                       }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                       title="Ver lista de cultivos predefinidos"
                     >
                       <ChevronDown
                         className={`w-4 h-4 transition-transform duration-200 ${
-                          showCultivoDropdown ? 'rotate-180 text-emerald-400' : ''
+                          showCultivoDropdown ? 'rotate-180 text-emerald-600' : ''
                         }`}
                       />
                     </button>
@@ -4001,14 +4001,14 @@ function SiembraEditModal({
                 </div>
 
                 {showCultivoDropdown && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto py-1 divide-y divide-slate-800">
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-950/90 flex items-center justify-between sticky top-0 z-10 backdrop-blur">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto py-1 divide-y divide-slate-100">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 flex items-center justify-between sticky top-0 z-10">
                       <span>Cultivos y Pasturas ({opcionesCultivos.length})</span>
                       {isTypingCultivo && (
                         <button
                           type="button"
                           onClick={() => setIsTypingCultivo(false)}
-                          className="text-emerald-400 hover:underline cursor-pointer lowercase"
+                          className="text-emerald-600 hover:underline cursor-pointer lowercase"
                         >
                           ver todos
                         </button>
@@ -4028,12 +4028,12 @@ function SiembraEditModal({
                             }}
                             className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition cursor-pointer ${
                               isSelected
-                                ? 'bg-emerald-950/80 text-emerald-300 font-bold border-l-2 border-emerald-400'
-                                : 'text-slate-200 hover:bg-slate-800 hover:text-white font-medium'
+                                ? 'bg-emerald-50 text-emerald-800 font-bold border-l-2 border-emerald-600'
+                                : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium'
                             }`}
                           >
                             <span className="truncate">{c}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 ml-2" />}
+                            {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 ml-2" />}
                           </button>
                         );
                       })}
@@ -4043,22 +4043,22 @@ function SiembraEditModal({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Variedad / Híbrido</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Variedad / Híbrido</label>
                 <input
                   type="text"
                   value={form.variedad_hibrido}
                   onChange={(e) => setForm({ ...form, variedad_hibrido: e.target.value })}
                   placeholder="Ej: Dekalb 72-10, Barturbo..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Estado de la Siembra</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Estado de la Siembra</label>
                 <select
                   value={form.estado}
                   onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                 >
                   {ESTADOS_SIEMBRA.map((st) => (
                     <option key={st} value={st}>
@@ -4069,47 +4069,47 @@ function SiembraEditModal({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Fecha de Siembra / Inicio</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Fecha de Siembra / Inicio</label>
                 <input
                   type="date"
                   value={form.fecha || ''}
                   onChange={(e) => setForm({ ...form, fecha: e.target.value })}
                   onClick={(e) => e.currentTarget.showPicker?.()}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold cursor-pointer focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold cursor-pointer focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                 />
               </div>
             </div>
           </div>
 
           {/* SECCIÓN 2: Insumos del Lote (Semillas, Fertilizantes y Químicos) - TABLA ÚNICA */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
                 <span>2. Insumos del Lote (Semillas, Fertilizantes y Químicos)</span>
               </h4>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => triggerScanSection('insumos')}
-                  className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+                  className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
                   title="Subir archivo o foto de receta técnica, remito o cotización con IA"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
                   <span>✨ Cargar desde Receta o Cotización</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowSeedCalc(!showSeedCalc)}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
                 >
-                  <Boxes className="w-3.5 h-3.5 text-emerald-400" />
+                  <Boxes className="w-3.5 h-3.5 text-emerald-600" />
                   <span>{showSeedCalc ? 'Ocultar Asistente' : '📦 Asistente Semilla'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => addInsumoRow('Agroquímico')}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar Insumo</span>
@@ -4119,24 +4119,24 @@ function SiembraEditModal({
 
             {/* Asistente Interactivo de Bolsas y Densidad kg/ha */}
             {showSeedCalc && (
-              <div className="bg-slate-900 p-3.5 rounded-xl border border-emerald-500/40 space-y-3">
+              <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
-                    <Calculator className="w-4 h-4" />
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-emerald-700" />
                     Cálculo Automático de Semilla por Bolsas / Densidad (Superficie: {totHaActual.toFixed(1)} ha)
                   </span>
-                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setSeedCalcMode('kgha')}
-                      className={'px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer ' + (seedCalcMode === 'kgha' ? 'bg-emerald-600 text-white' : 'text-slate-400')}
+                      className={'px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition ' + (seedCalcMode === 'kgha' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900')}
                     >
                       Por kg/ha
                     </button>
                     <button
                       type="button"
                       onClick={() => setSeedCalcMode('bolsas')}
-                      className={'px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer ' + (seedCalcMode === 'bolsas' ? 'bg-emerald-600 text-white' : 'text-slate-400')}
+                      className={'px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition ' + (seedCalcMode === 'bolsas' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900')}
                     >
                       Por Bolsas
                     </button>
@@ -4146,7 +4146,7 @@ function SiembraEditModal({
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                   {seedCalcMode === 'kgha' ? (
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
                         Densidad Deseada (kg/ha)
                       </label>
                       <StepperInput
@@ -4160,7 +4160,7 @@ function SiembraEditModal({
                     </div>
                   ) : (
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
                         Cantidad de Bolsas a sembrar
                       </label>
                       <StepperInput
@@ -4175,7 +4175,7 @@ function SiembraEditModal({
                   )}
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">
+                    <label className="block text-[10px] font-bold text-slate-700 mb-1">
                       Peso de la Bolsa (kg)
                     </label>
                     <div className="flex items-center gap-1">
@@ -4184,7 +4184,7 @@ function SiembraEditModal({
                           key={kg}
                           type="button"
                           onClick={() => setSeedPesoBolsa(kg)}
-                          className={'px-2 py-1 rounded text-xs font-bold cursor-pointer border ' + (Number(seedPesoBolsa) === kg ? 'bg-emerald-700 text-white border-emerald-500' : 'bg-slate-950 text-slate-400 border-slate-700')}
+                          className={'px-2 py-1 rounded text-xs font-bold cursor-pointer border ' + (Number(seedPesoBolsa) === kg ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50')}
                         >
                           {kg}kg
                         </button>
@@ -4200,11 +4200,11 @@ function SiembraEditModal({
                     </div>
                   </div>
 
-                  <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 font-mono text-xs space-y-0.5">
-                    <div className="text-slate-400 text-[10px]">
-                      Total: <span className="text-white font-bold">{calcTotalKg} kg</span> ({calcTotalBolsas} bolsas)
+                  <div className="bg-white p-2 rounded-lg border border-emerald-200 font-mono text-xs space-y-0.5 shadow-2xs">
+                    <div className="text-slate-600 text-[10px]">
+                      Total: <span className="text-slate-900 font-bold">{calcTotalKg} kg</span> ({calcTotalBolsas} bolsas)
                     </div>
-                    <div className="text-emerald-400 font-bold">
+                    <div className="text-emerald-700 font-bold">
                       Densidad: {calcDensidadKgHa} kg/ha
                     </div>
                   </div>
@@ -4213,7 +4213,7 @@ function SiembraEditModal({
                     <button
                       type="button"
                       onClick={applySeedCalcToReceta}
-                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition"
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition"
                     >
                       <Plus className="w-4 h-4" />
                       Agregar Semilla a Insumos
@@ -4230,7 +4230,7 @@ function SiembraEditModal({
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-3 text-[10px] font-bold text-emerald-300 uppercase px-2 mb-1 tracking-wider">
+                <div className="grid grid-cols-12 gap-3 text-[10px] font-bold text-slate-500 uppercase px-2 mb-1 tracking-wider">
                   <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Tipo & Producto</div>
                   <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Presentación / Envase</div>
                   <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Cantidad / Dosis</div>
@@ -4244,7 +4244,7 @@ function SiembraEditModal({
                   return (
                     <div
                       key={ins.id || idx}
-                      className="grid grid-cols-12 gap-3 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
+                      className="grid grid-cols-12 gap-3 items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 shadow-2xs transition"
                     >
                       {/* 1. Tipo & Producto */}
                       <div className={(isAdmin ? 'col-span-3' : 'col-span-4') + ' space-y-1'}>
@@ -4252,7 +4252,7 @@ function SiembraEditModal({
                           <select
                             value={ins.tipo || 'Agroquímico'}
                             onChange={(e) => updateInsumoRow(idx, 'tipo', e.target.value)}
-                            className="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-emerald-400 focus:outline-none"
+                            className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 focus:outline-none focus:border-emerald-600"
                           >
                             <option value="Semilla">🌱 Semilla</option>
                             <option value="Fertilizante">🧪 Fertilizante</option>
@@ -4263,7 +4263,7 @@ function SiembraEditModal({
                             placeholder="Nombre del producto / híbrido"
                             value={ins.producto || ''}
                             onChange={(e) => updateInsumoRow(idx, 'producto', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-semibold text-xs focus:outline-none focus:border-emerald-500"
+                            className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-900 font-semibold text-xs focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                           />
                         </div>
                         <div className="flex items-center gap-1">
@@ -4272,14 +4272,14 @@ function SiembraEditModal({
                             placeholder="Proveedor / Cooperativa (opcional)"
                             value={ins.proveedor || ''}
                             onChange={(e) => updateInsumoRow(idx, 'proveedor', e.target.value)}
-                            className="w-1/2 bg-slate-950/60 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400"
+                            className="w-1/2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] text-slate-600 placeholder:text-slate-400"
                           />
                           <input
                             type="text"
                             placeholder="N° Remito (opcional)"
                             value={ins.remito || ''}
                             onChange={(e) => updateInsumoRow(idx, 'remito', e.target.value)}
-                            className="w-1/2 bg-slate-950/60 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400"
+                            className="w-1/2 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] text-slate-600 placeholder:text-slate-400"
                           />
                         </div>
                       </div>
@@ -4289,7 +4289,7 @@ function SiembraEditModal({
                         <select
                           value={ins.presentacion || calc.pres.id}
                           onChange={(e) => updateInsumoRow(idx, 'presentacion', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 font-medium focus:outline-none focus:border-emerald-500"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800 font-medium focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                         >
                           {PRESENTACIONES_INSUMOS.map((p) => (
                             <option key={p.id} value={p.id}>
@@ -4297,7 +4297,7 @@ function SiembraEditModal({
                             </option>
                           ))}
                         </select>
-                        <div className="text-[9.5px] text-slate-400 px-0.5 truncate">
+                        <div className="text-[9.5px] text-slate-500 px-0.5 truncate font-medium">
                           {calc.hasEnvase ? `${calc.pres.factor} ${calc.pres.unidadBase} / ${calc.pres.envase === 'bolsas' ? 'bolsa' : 'envase'}` : 'Unidad directa'}
                         </div>
                       </div>
@@ -4314,7 +4314,7 @@ function SiembraEditModal({
                             className={`px-2 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                               calc.modoCalculo === 'dosis'
                                 ? 'bg-emerald-600 text-white font-black shadow-2xs'
-                                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                : 'bg-slate-200 text-slate-600 hover:text-slate-900'
                             }`}
                             title="Calcular total automáticamente desde la dosis por hectárea"
                           >
@@ -4329,7 +4329,7 @@ function SiembraEditModal({
                             className={`px-2 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                               calc.modoCalculo === 'total'
                                 ? 'bg-emerald-600 text-white font-black shadow-2xs'
-                                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                : 'bg-slate-200 text-slate-600 hover:text-slate-900'
                             }`}
                             title="Ingresar cantidad total de envases o unidades físicas"
                           >
@@ -4339,47 +4339,47 @@ function SiembraEditModal({
 
                         {calc.modoCalculo === 'dosis' ? (
                           <>
-                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-emerald-500 transition min-w-0">
+                            <div className="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-500 transition min-w-0">
                               <NumericInput
                                 value={ins.dosis_ha ?? ''}
                                 placeholder="0"
                                 onChange={(val) => updateInsumoRow(idx, 'dosis_ha', val)}
                                 allowDecimals={true}
                                 maxDecimals={2}
-                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-slate-900 font-mono font-bold text-xs text-right focus:outline-none tabular-nums"
                               />
-                              <span className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0">
+                              <span className="px-1.5 py-1 bg-slate-100 border-l border-slate-200 text-[9.5px] text-slate-600 font-bold uppercase shrink-0">
                                 {calc.pres.unidadBase}/ha
                               </span>
                             </div>
-                            <div className="text-[9.5px] font-mono text-emerald-400 font-semibold mt-0.5 truncate">
+                            <div className="text-[9.5px] font-mono text-emerald-800 font-semibold mt-0.5 truncate tabular-nums">
                               = {calc.totalBase.toLocaleString('es-AR')} {calc.pres.unidadBase}
                               {calc.hasEnvase && ` · ${calc.cantEnvases} ${calc.pres.envase} (${calc.pres.factor} ${calc.pres.unidadBase})`}
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-emerald-500 transition min-w-0">
+                            <div className="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-500 transition min-w-0">
                               <NumericInput
                                 value={ins.cantidad ?? ''}
                                 placeholder={calc.hasEnvase ? (calc.pres.envase || 'Bolsas') : '0'}
                                 onChange={(val) => updateInsumoRow(idx, 'cantidad', val)}
                                 allowDecimals={true}
                                 maxDecimals={2}
-                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-slate-900 font-mono font-bold text-xs text-right focus:outline-none tabular-nums"
                               />
-                              <span className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0">
+                              <span className="px-1.5 py-1 bg-slate-100 border-l border-slate-200 text-[9.5px] text-slate-600 font-bold uppercase shrink-0">
                                 {calc.hasEnvase ? (calc.pres.envase || 'bolsas') : calc.pres.unidadBase}
                               </span>
                             </div>
-                            <div className="text-[9.5px] font-mono text-emerald-400 font-semibold mt-0.5 truncate">
+                            <div className="text-[9.5px] font-mono text-emerald-800 font-semibold mt-0.5 truncate tabular-nums">
                               {calc.hasEnvase ? (
                                 <>
                                   = {calc.totalBase.toLocaleString('es-AR')} {calc.pres.unidadBase} ·{' '}
-                                  <span className="text-teal-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
+                                  <span className="text-teal-700 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
                                 </>
                               ) : (
-                                <span className="text-teal-300 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
+                                <span className="text-teal-700 font-bold">{calc.dosisReal.toFixed(2)} {calc.pres.unidadBase}/ha</span>
                               )}
                             </div>
                           </>
@@ -4395,8 +4395,8 @@ function SiembraEditModal({
                               onClick={() => updateInsumoRow(idx, 'moneda', calc.moneda === 'USD' ? 'ARS' : 'USD')}
                               className={`px-1.5 py-0.5 rounded text-[9.5px] font-black cursor-pointer border shrink-0 transition ${
                                 calc.moneda === 'USD'
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                  : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : 'bg-blue-50 text-blue-800 border-blue-300'
                               }`}
                               title="Cambiar moneda (USD / ARS)"
                             >
@@ -4408,13 +4408,13 @@ function SiembraEditModal({
                               onChange={(val) => updateInsumoRow(idx, 'precio_unitario', val)}
                               allowDecimals={true}
                               maxDecimals={2}
-                              className="w-full min-w-[90px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500"
+                              className="w-full min-w-[90px] bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-900 font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 tabular-nums"
                             />
                           </div>
-                          <div className="text-[9px] text-slate-400 pr-1 truncate">
+                          <div className="text-[9px] text-slate-500 pr-1 truncate">
                             Precio / {calc.unidadPrecio}
                             {calc.hasEnvase && calc.precioBase > 0 && (
-                              <span className="text-slate-500 font-mono"> (≈ ${calc.precioBase.toFixed(2)}/{calc.pres.unidadBase})</span>
+                              <span className="text-slate-400 font-mono"> (≈ ${calc.precioBase.toFixed(2)}/{calc.pres.unidadBase})</span>
                             )}
                           </div>
                         </div>
@@ -4423,13 +4423,13 @@ function SiembraEditModal({
                       {/* 5. Subtotal Calculado (Solo Modo Admin / Económico) */}
                       {isAdmin && (
                         <div className="col-span-1 text-right">
-                          <div className="text-xs font-mono font-black text-emerald-400 truncate">
+                          <div className="text-xs font-mono font-black text-emerald-700 truncate tabular-nums">
                             {calc.subtotalUsd > 0
                               ? `USD $${Math.round(calc.subtotalUsd).toLocaleString('es-AR')}`
                               : '$0,00'}
                           </div>
                           {calc.subtotalUsd > 0 && (
-                            <div className="text-[9px] font-mono text-slate-400 truncate">
+                            <div className="text-[9px] font-mono text-slate-500 truncate tabular-nums">
                               ${calc.costoHaUsd.toFixed(1)}/ha
                             </div>
                           )}
@@ -4441,7 +4441,7 @@ function SiembraEditModal({
                         <button
                           type="button"
                           onClick={() => removeInsumoRow(idx)}
-                          className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer transition"
+                          className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition"
                           title="Eliminar insumo"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -4455,26 +4455,26 @@ function SiembraEditModal({
           </div>
 
           {/* SECCIÓN 3: Labores Agrícolas & Contratista */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-400" />
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
                 <span>3. Labores Agrícolas & Contratista (Maquinaria)</span>
               </h4>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => triggerScanSection('labores')}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
                   title="Subir archivo o foto de factura/orden de labor con IA"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   <span>✨ Leer Labor con IA</span>
                 </button>
                 <button
                   type="button"
                   onClick={addLaborRow}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar Labor</span>
@@ -4488,7 +4488,7 @@ function SiembraEditModal({
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-indigo-300 uppercase px-2 mb-1 tracking-wider">
+                <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 uppercase px-2 mb-1 tracking-wider">
                   <div className="col-span-2">Fecha</div>
                   <div className={isAdmin ? 'col-span-3' : 'col-span-4'}>Labor Agrícola</div>
                   <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Contratista / Equipo</div>
@@ -4502,7 +4502,7 @@ function SiembraEditModal({
                   return (
                     <div
                       key={idx}
-                      className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
+                      className="grid grid-cols-12 gap-2 items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 shadow-2xs transition"
                     >
                       {/* Fecha */}
                       <div className="col-span-2">
@@ -4511,7 +4511,7 @@ function SiembraEditModal({
                           value={lab.fecha || ''}
                           onChange={(e) => updateLaborRow(idx, 'fecha', e.target.value)}
                           onClick={(e) => e.currentTarget.showPicker?.()}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-[11px] cursor-pointer focus:border-emerald-500"
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 text-[11px] cursor-pointer focus:border-indigo-600"
                         />
                       </div>
 
@@ -4523,7 +4523,7 @@ function SiembraEditModal({
                           placeholder="Labor agrícola"
                           value={lab.labor || ''}
                           onChange={(e) => updateLaborRow(idx, 'labor', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white font-semibold text-xs"
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1 text-slate-900 font-semibold text-xs focus:border-indigo-600"
                         />
                         <datalist id="labores_modal_list">
                           {LABORES_PREDEFINIDAS.map((l) => (
@@ -4539,7 +4539,7 @@ function SiembraEditModal({
                           placeholder="Contratista / Equipo"
                           value={lab.contratista || ''}
                           onChange={(e) => updateLaborRow(idx, 'contratista', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs"
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-slate-800 text-xs focus:border-indigo-600"
                         />
                       </div>
 
@@ -4551,9 +4551,9 @@ function SiembraEditModal({
                             onChange={(val) => updateLaborRow(idx, 'ha', val)}
                             allowDecimals={true}
                             maxDecimals={2}
-                            className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400"
+                            className="w-20 bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-900 font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-600 tabular-nums"
                           />
-                          <span className="text-[10px] text-slate-400">ha</span>
+                          <span className="text-[10px] text-slate-500 font-medium">ha</span>
                         </div>
                       </div>
 
@@ -4567,7 +4567,7 @@ function SiembraEditModal({
                               className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                                 calc.modoTarifa === 'por_ha'
                                   ? 'bg-indigo-600 text-white font-black shadow-2xs'
-                                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                  : 'bg-slate-200 text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               $/ha
@@ -4578,7 +4578,7 @@ function SiembraEditModal({
                               className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold cursor-pointer transition ${
                                 calc.modoTarifa === 'monto_fijo'
                                   ? 'bg-indigo-600 text-white font-black shadow-2xs'
-                                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                                  : 'bg-slate-200 text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Monto Fijo
@@ -4588,7 +4588,7 @@ function SiembraEditModal({
                             <button
                               type="button"
                               onClick={() => updateLaborRow(idx, 'moneda', calc.moneda === 'USD' ? 'ARS' : 'USD')}
-                              className={'px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer border ' + (calc.moneda === 'USD' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-blue-500/20 text-blue-300 border-blue-500/40')}
+                              className={'px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer border ' + (calc.moneda === 'USD' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-blue-50 text-blue-800 border-blue-300')}
                             >
                               {calc.moneda}
                             </button>
@@ -4598,17 +4598,17 @@ function SiembraEditModal({
                               onChange={(val) => updateLaborRow(idx, 'tarifa_ha', val)}
                               allowDecimals={true}
                               maxDecimals={2}
-                              className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-indigo-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400"
+                              className="w-full min-w-[115px] bg-white border border-slate-300 rounded-lg px-2 py-1 text-indigo-700 font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-600 tabular-nums"
                             />
                           </div>
-                          <div className="text-[9px] text-slate-400 mt-0.5">
+                          <div className="text-[9px] text-slate-500 mt-0.5">
                             {calc.modoTarifa === 'por_ha' ? 'Tarifa por hectárea' : `Monto total del lote (≈ $${calc.tarifaHa.toFixed(1)}/ha)`}
                           </div>
-                          <div className="bg-slate-950/80 px-2 py-1 rounded-lg border border-slate-800 mt-1">
-                            <div className="text-[11px] font-mono font-black text-indigo-400">
+                          <div className="bg-white px-2 py-1 rounded-lg border border-slate-200 mt-1 shadow-2xs">
+                            <div className="text-[11px] font-mono font-black text-indigo-700 tabular-nums">
                               USD ${Math.round(calc.subtotalUsd).toLocaleString('es-AR')}
                             </div>
-                            <div className="text-[9.5px] font-mono text-slate-400">
+                            <div className="text-[9.5px] font-mono text-slate-500 tabular-nums">
                               ≈ ARS ${Math.round(calc.subtotalArs).toLocaleString('es-AR')}
                             </div>
                           </div>
@@ -4620,7 +4620,7 @@ function SiembraEditModal({
                         <button
                           type="button"
                           onClick={() => removeLaborRow(idx)}
-                          className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer transition"
+                          className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition"
                           title="Eliminar labor"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -4635,7 +4635,7 @@ function SiembraEditModal({
 
           {/* Observaciones agronómicas */}
           <div>
-            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+            <label className="text-[11px] font-semibold text-slate-700 block mb-1">
               Observaciones agronómicas / notas técnicas del lote
             </label>
             <textarea
@@ -4643,122 +4643,122 @@ function SiembraEditModal({
               value={form.observaciones}
               onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
               placeholder="Instrucciones de mezcla, condiciones climáticas, estado del rastrojo, humedad..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs"
             />
           </div>
 
           {/* PANEL CONSOLIDADO: FINANCIERO (MODO ADMIN) VS TÉCNICO (MODO PRODUCCIÓN) */}
           {isAdmin ? (
-            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl p-4 shadow-xl space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                <span className="text-xs font-bold text-white flex items-center gap-2">
-                  <Calculator className="w-4 h-4 text-emerald-400" />
+            <div className="bg-white border-2 border-emerald-500/40 rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-emerald-600" />
                   <span>Consolidado de Inversión Agronómica en Vivo</span>
                 </span>
-                <span className="text-xs font-mono font-black text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-800">
+                <span className="text-xs font-mono font-black text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                   Superficie Total: {totHaActual.toFixed(1)} ha ({isMultiPotrero ? (selectedPotreros.length + ' potreros') : ('Potrero #' + form.potrero_numero)})
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 {/* Semillas */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-teal-400 font-bold block uppercase tracking-wider mb-0.5">🌱 Semillas</span>
-                  <span className="text-sm font-black text-white font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-teal-700 font-bold block uppercase tracking-wider mb-0.5">🌱 Semillas</span>
+                  <span className="text-sm font-black text-slate-900 font-mono block tabular-nums">
                     USD ${Math.round(totalSemillasUsd).toLocaleString('es-AR')}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-slate-500 font-mono tabular-nums">
                     ${(totHaActual > 0 ? totalSemillasUsd / totHaActual : 0).toFixed(1)}/ha
                   </span>
                 </div>
 
                 {/* Agroquímicos */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-amber-400 font-bold block uppercase tracking-wider mb-0.5">🧪 Insumos / Químicos</span>
-                  <span className="text-sm font-black text-white font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-amber-700 font-bold block uppercase tracking-wider mb-0.5">🧪 Insumos / Químicos</span>
+                  <span className="text-sm font-black text-slate-900 font-mono block tabular-nums">
                     USD ${Math.round(totalAgroquimicosUsd).toLocaleString('es-AR')}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-slate-500 font-mono tabular-nums">
                     ${(totHaActual > 0 ? totalAgroquimicosUsd / totHaActual : 0).toFixed(1)}/ha
                   </span>
                 </div>
 
                 {/* Labores */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-indigo-400 font-bold block uppercase tracking-wider mb-0.5">🚜 Labores & Contratista</span>
-                  <span className="text-sm font-black text-white font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-indigo-700 font-bold block uppercase tracking-wider mb-0.5">🚜 Labores & Contratista</span>
+                  <span className="text-sm font-black text-slate-900 font-mono block tabular-nums">
                     USD ${Math.round(totalLaboresUsd).toLocaleString('es-AR')}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-slate-500 font-mono tabular-nums">
                     ${(totHaActual > 0 ? totalLaboresUsd / totHaActual : 0).toFixed(1)}/ha
                   </span>
                 </div>
 
                 {/* Inversión Consolidada */}
-                <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/50">
-                  <span className="text-[10px] text-emerald-400 font-black block uppercase tracking-wider mb-0.5">💰 Inversión Total</span>
-                  <span className="text-sm font-black text-emerald-300 font-mono block">
+                <div className="bg-emerald-50/90 p-2.5 rounded-xl border border-emerald-300">
+                  <span className="text-[10px] text-emerald-800 font-black block uppercase tracking-wider mb-0.5">💰 Inversión Total</span>
+                  <span className="text-sm font-black text-emerald-950 font-mono block tabular-nums">
                     USD ${Math.round(totalInversionUsd).toLocaleString('es-AR')}
                   </span>
-                  <span className="text-[10px] text-slate-300 font-mono">
+                  <span className="text-[10px] text-emerald-800 font-mono tabular-nums">
                     ARS ${Math.round(totalInversionArs).toLocaleString('es-AR')} (${usdPorHa.toFixed(1)}/ha)
                   </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl p-4 shadow-xl space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                <span className="text-xs font-bold text-white flex items-center gap-2">
-                  <Sprout className="w-4 h-4 text-emerald-400" />
+            <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <Sprout className="w-4 h-4 text-emerald-600" />
                   <span>Resumen Técnico Operativo de Siembra (Modo Campo)</span>
                 </span>
-                <span className="text-xs font-mono font-black text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-800">
+                <span className="text-xs font-mono font-black text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                   Superficie Total: {totHaActual.toFixed(1)} ha ({isMultiPotrero ? (selectedPotreros.length + ' potreros') : ('Potrero #' + form.potrero_numero)})
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 {/* Cultivo / Variedad */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wider mb-0.5">🌱 Recurso Forrajero</span>
-                  <span className="text-xs font-black text-white truncate block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-emerald-700 font-bold block uppercase tracking-wider mb-0.5">🌱 Recurso Forrajero</span>
+                  <span className="text-xs font-black text-slate-900 truncate block">
                     {form.cultivo_variedad || 'Pastura'}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500">
                     {form.variedad_hibrido || 'Campaña ' + (form.campana || '2026/2027')}
                   </span>
                 </div>
 
                 {/* Insumos del lote */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-teal-300 font-bold block uppercase tracking-wider mb-0.5">📦 Insumos del Lote</span>
-                  <span className="text-sm font-black text-teal-400 font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-teal-700 font-bold block uppercase tracking-wider mb-0.5">📦 Insumos del Lote</span>
+                  <span className="text-sm font-black text-teal-800 font-mono block tabular-nums">
                     {form.insumos_json.length} {form.insumos_json.length === 1 ? 'insumo' : 'insumos'}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500">
                     semillas, fertilizantes y químicos
                   </span>
                 </div>
 
                 {/* Superficie Total */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-amber-400 font-bold block uppercase tracking-wider mb-0.5">📐 Área de Labor</span>
-                  <span className="text-sm font-black text-amber-300 font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-amber-700 font-bold block uppercase tracking-wider mb-0.5">📐 Área de Labor</span>
+                  <span className="text-sm font-black text-amber-900 font-mono block tabular-nums">
                     {totHaActual.toFixed(1)} ha
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500">
                     {isMultiPotrero ? `${selectedPotreros.length} potreros` : `Potrero #${form.potrero_numero}`}
                   </span>
                 </div>
 
                 {/* Labores */}
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-[10px] text-indigo-400 font-bold block uppercase tracking-wider mb-0.5">🚜 Maquinaria & Labores</span>
-                  <span className="text-sm font-black text-indigo-300 font-mono block">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] text-indigo-700 font-bold block uppercase tracking-wider mb-0.5">🚜 Maquinaria & Labores</span>
+                  <span className="text-sm font-black text-indigo-900 font-mono block tabular-nums">
                     {form.labores_json.length} {form.labores_json.length === 1 ? 'labor' : 'labores'}
                   </span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500">
                     Estado: {form.estado || 'Sembrado'}
                   </span>
                 </div>
@@ -4768,12 +4768,12 @@ function SiembraEditModal({
         </div>
 
         {/* Footer Modal con Acciones */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/90 rounded-b-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-          <div className="text-xs text-slate-400">
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/90 rounded-b-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+          <div className="text-xs text-slate-600">
             {isAdmin ? (
-              <>Dólar Ref: <span className="font-bold text-white font-mono">${dolarRef}</span> · Prorrateo automático por ha al guardar.</>
+              <>Dólar Ref: <span className="font-bold text-slate-900 font-mono">${dolarRef}</span> · Prorrateo automático por ha al guardar.</>
             ) : (
-              <>Superficie: <span className="font-bold text-white font-mono">{totHaActual.toFixed(1)} ha</span> · Registro técnico operativo de campo.</>
+              <>Superficie: <span className="font-bold text-slate-900 font-mono">{totHaActual.toFixed(1)} ha</span> · Registro técnico operativo de campo.</>
             )}
           </div>
 
@@ -4782,7 +4782,7 @@ function SiembraEditModal({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
+              className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition shadow-2xs"
             >
               Cancelar
             </button>
@@ -4790,7 +4790,7 @@ function SiembraEditModal({
               type="button"
               onClick={handleConfirmSave}
               disabled={saving}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer transition active:scale-95"
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-700/20 flex items-center gap-2 cursor-pointer transition active:scale-95"
             >
               {saving ? (
                 <>
@@ -7541,32 +7541,32 @@ function DescontarStockModal({ stockInsumos, insumoItem, siembra, onClose, onCon
   const selectedStockObj = stockInsumos.find((s) => s.id === Number(selectedStockId));
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2 text-white font-bold text-sm">
-            <PackageMinus className="w-5 h-5 text-teal-400" />
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 text-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+            <PackageMinus className="w-5 h-5 text-teal-600" />
             <span>Descontar de Inventario de Insumos</span>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs text-slate-300">
+        <p className="text-xs text-slate-600">
           Seleccioná el insumo correspondiente en tu inventario para rebajar las unidades aplicadas en el Potrero #
           {siembra.potrero_numero}.
         </p>
 
         <div className="space-y-3 text-xs">
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+            <label className="text-[11px] font-semibold text-slate-700 block mb-1">
               Insumo en Stock (Inventario General)
             </label>
             <select
               value={selectedStockId}
               onChange={(e) => setSelectedStockId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-teal-500"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-500"
             >
               {stockInsumos.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -7577,32 +7577,32 @@ function DescontarStockModal({ stockInsumos, insumoItem, siembra, onClose, onCon
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 block mb-1">Cantidad a Descontar</label>
+            <label className="text-[11px] font-semibold text-slate-700 block mb-1">Cantidad a Descontar</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 step="0.01"
                 value={cantidad}
                 onChange={(e) => setCantidad(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-teal-500"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono font-bold focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-500 tabular-nums"
               />
-              <span className="text-xs font-semibold text-slate-400 px-2">
+              <span className="text-xs font-semibold text-slate-500 px-2">
                 {selectedStockObj?.unidad || insumoItem.unidad || 'L'}
               </span>
             </div>
           </div>
 
           {selectedStockObj && (
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
               <div>
                 Stock actual:{' '}
-                <strong className="text-white">
+                <strong className="text-slate-900">
                   {selectedStockObj.cantidad_actual} {selectedStockObj.unidad}
                 </strong>
               </div>
               <div>
                 Stock proyectado post-aplicación:{' '}
-                <strong className="text-emerald-400">
+                <strong className="text-emerald-700">
                   {Math.max(0, Number(selectedStockObj.cantidad_actual || 0) - Number(cantidad || 0))}{' '}
                   {selectedStockObj.unidad}
                 </strong>
@@ -7615,14 +7615,14 @@ function DescontarStockModal({ stockInsumos, insumoItem, siembra, onClose, onCon
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition shadow-2xs"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={() => onConfirm(insumoItem, selectedStockId, cantidad)}
-            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer transition active:scale-95"
           >
             <Check className="w-4 h-4" />
             <span>Confirmar Descuento</span>
@@ -7678,22 +7678,22 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden my-auto text-slate-900">
         {/* Encabezado */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 rounded-t-2xl shrink-0">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/90 rounded-t-2xl shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <Receipt className="w-4 h-4 text-emerald-400" />
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+              <Receipt className="w-4 h-4 text-emerald-700" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>Catálogo de Presupuestos & Cotizaciones</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
                   {presupuestos.length} guardados
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Historial de cotizaciones guardadas para consulta y valorización automática en San José
               </p>
             </div>
@@ -7701,18 +7701,18 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Contenido */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 bg-slate-50/30">
           {presupuestos.length === 0 ? (
-            <div className="text-center py-12 space-y-3 bg-slate-950/60 rounded-xl border border-slate-800/80 p-6">
-              <Receipt className="w-10 h-10 text-slate-600 mx-auto" />
-              <div className="text-slate-300 font-bold text-sm">No hay presupuestos archivados aún</div>
+            <div className="text-center py-12 space-y-3 bg-white rounded-xl border border-slate-200 p-6 shadow-2xs">
+              <Receipt className="w-10 h-10 text-slate-400 mx-auto" />
+              <div className="text-slate-800 font-bold text-sm">No hay presupuestos archivados aún</div>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Al usar "Cruzar Factura / Presupuesto" o escanear documentos de la Cooperativa, los precios unitarios se guardan automáticamente en este catálogo para consultar y sugerir cotizaciones en futuras siembras.
               </p>
@@ -7727,30 +7727,30 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
                     key={p.id}
                     className={`border rounded-xl p-4 transition ${
                       isSelected
-                        ? 'bg-slate-950 border-emerald-500/60 shadow-md'
-                        : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                        ? 'bg-white border-emerald-500 shadow-md ring-1 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
-                          <Receipt className="w-4 h-4 text-emerald-400" />
+                        <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                          <Receipt className="w-4 h-4 text-emerald-700" />
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-white flex items-center gap-2">
+                          <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span>{p.proveedor || 'Cooperativa / Proveedor'}</span>
                             {p.numero_documento && (
-                              <span className="text-[11px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                              <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                                 #{p.numero_documento}
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                             <span>📅 {formatFechaAR(p.fecha)}</span>
                             <span>•</span>
-                            <span className="text-emerald-400 font-medium">{itemsCount} {itemsCount === 1 ? 'insumo cotizado' : 'insumos cotizados'}</span>
+                            <span className="text-emerald-700 font-medium">{itemsCount} {itemsCount === 1 ? 'insumo cotizado' : 'insumos cotizados'}</span>
                             <span>•</span>
-                            <span className="font-mono text-slate-300">{p.moneda || 'USD'}</span>
+                            <span className="font-mono text-slate-700 font-semibold">{p.moneda || 'USD'}</span>
                           </div>
                         </div>
                       </div>
@@ -7761,8 +7761,8 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
                           onClick={() => setSelectedPresupuesto(isSelected ? null : p)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-600 text-white border-emerald-500'
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
                           }`}
                         >
                           {isSelected ? 'Ocultar Detalle' : 'Ver Insumos'}
@@ -7770,7 +7770,7 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
                         <button
                           type="button"
                           onClick={() => handleDelete(p.id, p.proveedor)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 border border-transparent hover:border-rose-800/40 transition cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent transition cursor-pointer"
                           title="Eliminar este presupuesto del catálogo"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -7780,28 +7780,28 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
 
                     {/* Detalle expandido de ítems */}
                     {isSelected && (
-                      <div className="mt-4 pt-3 border-t border-slate-800/80 animate-in fade-in duration-150 space-y-2">
-                        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <div className="mt-4 pt-3 border-t border-slate-200 animate-in fade-in duration-150 space-y-2">
+                        <div className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
                           Detalle de Insumos y Precios Unitarios
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs">
                             <thead>
-                              <tr className="border-b border-slate-800 text-[11px] text-slate-500 font-semibold">
+                              <tr className="border-b border-slate-200 text-[11px] text-slate-500 font-semibold">
                                 <th className="pb-1.5">Producto</th>
                                 <th className="pb-1.5 text-right">Cantidad</th>
                                 <th className="pb-1.5 text-right">Precio Unitario</th>
                                 <th className="pb-1.5 pl-3">Observaciones</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                            <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
                               {(p.items || []).map((it, itIdx) => (
-                                <tr key={itIdx} className="hover:bg-slate-900/50">
-                                  <td className="py-1.5 text-slate-200 font-sans font-medium">{it.producto}</td>
-                                  <td className="py-1.5 text-right text-slate-400">
+                                <tr key={itIdx} className="hover:bg-slate-50">
+                                  <td className="py-1.5 text-slate-900 font-sans font-medium">{it.producto}</td>
+                                  <td className="py-1.5 text-right text-slate-600 tabular-nums">
                                     {it.cantidad > 0 ? `${it.cantidad} ${it.unidad || ''}` : '-'}
                                   </td>
-                                  <td className="py-1.5 text-right text-emerald-300 font-bold">
+                                  <td className="py-1.5 text-right text-emerald-700 font-bold tabular-nums">
                                     {it.moneda || p.moneda || 'USD'} ${Number(it.precio_unitario || 0).toLocaleString('es-AR')}/{it.unidad || 'u'}
                                   </td>
                                   <td className="py-1.5 pl-3 font-sans text-slate-500 text-[10.5px]">
@@ -7822,14 +7822,14 @@ function CatalogoPresupuestosModal({ isOpen, onClose, notify }) {
         </div>
 
         {/* Footer fijo */}
-        <div className="px-6 py-3.5 bg-slate-900 border-t border-slate-800 rounded-b-2xl flex items-center justify-between shrink-0">
-          <span className="text-xs text-slate-400">
+        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 rounded-b-2xl flex items-center justify-between shrink-0">
+          <span className="text-xs text-slate-500">
             Los precios archivados alimentan las sugerencias automáticas de precios en San José.
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer shadow-2xs"
           >
             Cerrar
           </button>

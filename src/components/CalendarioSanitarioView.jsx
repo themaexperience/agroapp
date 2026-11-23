@@ -2719,73 +2719,73 @@ export default function CalendarioSanitarioView({
       {/* MODAL 1: DETALLE Y EJECUCIÓN DE PROTOCOLO SANITARIO                       */}
       {/* ========================================================================= */}
       {modalEventDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <span
                   className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${
                     modalEventDetail.colorCategory === 'amber'
-                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
                       : modalEventDetail.colorCategory === 'orange'
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
                       : modalEventDetail.colorCategory === 'emerald'
-                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                       : modalEventDetail.colorCategory === 'cyan'
-                      ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                      : 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                      : 'bg-purple-50 text-purple-800 border-purple-200'
                   }`}
                 >
                   {modalEventDetail.badge || modalEventDetail.tipo}
                 </span>
-                <span className="text-xs font-mono font-bold text-slate-400">
+                <span className="text-xs font-mono font-bold text-slate-500">
                   {formatFechaAR(modalEventDetail.date)}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setModalEventDetail(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div>
-              <h3 className="text-lg font-black text-white">{modalEventDetail.title}</h3>
-              <p className="text-xs text-slate-400 mt-1">{modalEventDetail.mes_epoca}</p>
+              <h3 className="text-lg font-black text-slate-900">{modalEventDetail.title}</h3>
+              <p className="text-xs text-slate-500 mt-1">{modalEventDetail.mes_epoca}</p>
             </div>
 
-            <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 space-y-2 text-xs">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
               {modalEventDetail.source === 'siembra' ? (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Cultivo / Especie:</span>
-                    <span className="font-bold text-cyan-300 text-right">
+                    <span className="text-slate-500">Cultivo / Especie:</span>
+                    <span className="font-bold text-cyan-800 text-right">
                       {modalEventDetail.raw?.cultivo_variedad || modalEventDetail.producto || 'Pastura / Verdeleo'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Campaña:</span>
-                    <span className="font-mono text-slate-200 font-bold">
+                    <span className="text-slate-500">Campaña:</span>
+                    <span className="font-mono text-slate-800 font-bold">
                       {modalEventDetail.raw?.campana || modalEventDetail.dosis || '2026/2027'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Superficie (ha):</span>
-                    <span className="font-bold text-white">
+                    <span className="text-slate-500">Superficie (ha):</span>
+                    <span className="font-bold text-slate-900 tabular-nums">
                       {(Number(modalEventDetail.raw?.ha_sembradas || modalEventDetail.raw?.hectareas) || 0).toFixed(1)} ha
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Potrero:</span>
-                    <span className="font-bold text-emerald-400">
+                    <span className="text-slate-500">Potrero:</span>
+                    <span className="font-bold text-emerald-800">
                       {modalEventDetail.raw?.potrero_numero ? `Potrero #${modalEventDetail.raw.potrero_numero}` : (modalEventDetail.rodeo || 'General')}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-800/60 pt-2 items-center">
-                    <span className="text-slate-400">Estado Actual:</span>
-                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 items-center">
+                    <span className="text-slate-500">Estado Actual:</span>
+                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-700' : 'text-amber-700'}`}>
                       {modalEventDetail.raw?.estado || (modalEventDetail.realizado ? '✓ Cumplido / Sembrado' : 'Pendiente')}
                     </span>
                   </div>
@@ -2793,18 +2793,18 @@ export default function CalendarioSanitarioView({
               ) : modalEventDetail.source === 'tarea' ? (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Prioridad:</span>
+                    <span className="text-slate-500">Prioridad:</span>
                     <span className={`font-extrabold px-2 py-0.5 rounded text-[10px] ${
                       (modalEventDetail.raw?.prioridad === 'Urgente' || modalEventDetail.raw?.prioridad === 'Alta')
-                        ? 'bg-rose-900/60 text-rose-300 border border-rose-700/60'
-                        : 'bg-purple-900/60 text-purple-200 border border-purple-700/60'
+                        ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                        : 'bg-purple-50 text-purple-800 border border-purple-200'
                     }`}>
                       {modalEventDetail.raw?.prioridad || 'Media'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Infraestructura / Ubicación:</span>
-                    <span className="font-semibold text-slate-200 text-right">
+                    <span className="text-slate-500">Infraestructura / Ubicación:</span>
+                    <span className="font-semibold text-slate-800 text-right">
                       {modalEventDetail.raw?.infraestructura_nombre
                         ? `${modalEventDetail.raw.infraestructura_nombre}${modalEventDetail.raw.potrero_numero ? ` (P#${modalEventDetail.raw.potrero_numero})` : ''}`
                         : modalEventDetail.raw?.potrero_numero
@@ -2814,13 +2814,13 @@ export default function CalendarioSanitarioView({
                   </div>
                   {modalEventDetail.raw?.responsable && (
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Responsable / Asignado:</span>
-                      <span className="font-medium text-slate-300">{modalEventDetail.raw.responsable}</span>
+                      <span className="text-slate-500">Responsable / Asignado:</span>
+                      <span className="font-medium text-slate-700">{modalEventDetail.raw.responsable}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t border-slate-800/60 pt-2 items-center">
-                    <span className="text-slate-400">Estado Actual:</span>
-                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-400' : 'text-purple-300'}`}>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 items-center">
+                    <span className="text-slate-500">Estado Actual:</span>
+                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-700' : 'text-purple-700'}`}>
                       {modalEventDetail.raw?.estado || (modalEventDetail.realizado ? '✓ Tarea Completada' : 'Pendiente de ejecución')}
                     </span>
                   </div>
@@ -2828,45 +2828,45 @@ export default function CalendarioSanitarioView({
               ) : modalEventDetail.source === 'proveedor' ? (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Proveedor / Servicio:</span>
-                    <span className="font-bold text-amber-300 text-right">
+                    <span className="text-slate-500">Proveedor / Servicio:</span>
+                    <span className="font-bold text-amber-800 text-right">
                       {modalEventDetail.raw?.proveedor_o_rubro || modalEventDetail.producto || modalEventDetail.title}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">
+                    <span className="text-slate-500">
                       {modalEventDetail.esSemanaORango ? 'Semana / Rango:' : 'Fecha Estimada:'}
                     </span>
-                    <span className="font-mono text-slate-200 font-bold">
+                    <span className="font-mono text-slate-800 font-bold">
                       {modalEventDetail.labelRango || formatFechaAR(modalEventDetail.date)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Estado Actual:</span>
+                    <span className="text-slate-500">Estado Actual:</span>
                     <span
                       className={`font-bold px-2 py-0.5 rounded text-[11px] ${
                         modalEventDetail.raw?.estado === 'Recibido' || modalEventDetail.realizado
-                          ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/60'
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           : modalEventDetail.raw?.estado === 'En Camino'
-                          ? 'bg-cyan-900/60 text-cyan-300 border border-cyan-700/60'
-                          : 'bg-amber-900/60 text-amber-300 border border-amber-700/60'
+                          ? 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-200'
                       }`}
                     >
                       {modalEventDetail.realizado ? '✓ Recibido en Establecimiento' : modalEventDetail.raw?.estado || 'Esperando'}
                     </span>
                   </div>
                   {modalEventDetail.raw?.indicaciones && (
-                    <div className="flex justify-between items-start gap-2 border-t border-slate-800/60 pt-2">
-                      <span className="text-slate-400 shrink-0">Indicaciones:</span>
-                      <span className="font-semibold text-slate-200 text-right">
+                    <div className="flex justify-between items-start gap-2 border-t border-slate-200 pt-2">
+                      <span className="text-slate-500 shrink-0">Indicaciones:</span>
+                      <span className="font-semibold text-slate-800 text-right">
                         {modalEventDetail.raw.indicaciones}
                       </span>
                     </div>
                   )}
                   {modalEventDetail.raw?.notas && (
-                    <div className="flex justify-between items-start gap-2 border-t border-slate-800/60 pt-2">
-                      <span className="text-slate-400 shrink-0">Notas:</span>
-                      <span className="text-slate-300 text-right italic">
+                    <div className="flex justify-between items-start gap-2 border-t border-slate-200 pt-2">
+                      <span className="text-slate-500 shrink-0">Notas:</span>
+                      <span className="text-slate-700 text-right italic">
                         {modalEventDetail.raw.notas}
                       </span>
                     </div>
@@ -2876,31 +2876,31 @@ export default function CalendarioSanitarioView({
                 <>
                   {modalEventDetail.producto && (
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Tratamiento / Producto:</span>
-                      <span className="font-bold text-white text-right">{modalEventDetail.producto}</span>
+                      <span className="text-slate-500">Tratamiento / Producto:</span>
+                      <span className="font-bold text-slate-900 text-right">{modalEventDetail.producto}</span>
                     </div>
                   )}
                   {modalEventDetail.dosis && (
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Dosis / Vía:</span>
-                      <span className="font-mono text-amber-300 font-bold">{modalEventDetail.dosis}</span>
+                      <span className="text-slate-500">Dosis / Vía:</span>
+                      <span className="font-mono text-amber-800 font-bold">{modalEventDetail.dosis}</span>
                     </div>
                   )}
                   {modalEventDetail.categoria && (
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Categoría Destino:</span>
-                      <span className="font-semibold text-slate-200">{modalEventDetail.categoria}</span>
+                      <span className="text-slate-500">Categoría Destino:</span>
+                      <span className="font-semibold text-slate-800">{modalEventDetail.categoria}</span>
                     </div>
                   )}
                   {modalEventDetail.rodeo && (
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Rodeo Aplicado:</span>
-                      <span className="font-bold text-emerald-300">{modalEventDetail.rodeo}</span>
+                      <span className="text-slate-500">Rodeo Aplicado:</span>
+                      <span className="font-bold text-emerald-800">{modalEventDetail.rodeo}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t border-slate-800/60 pt-2 items-center">
-                    <span className="text-slate-400">Estado Actual:</span>
-                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 items-center">
+                    <span className="text-slate-500">Estado Actual:</span>
+                    <span className={`font-bold ${modalEventDetail.realizado ? 'text-emerald-700' : 'text-amber-700'}`}>
                       {modalEventDetail.realizado ? '✓ Realizado / Cumplido' : 'Pendiente de aplicación'}
                     </span>
                   </div>
@@ -2909,8 +2909,8 @@ export default function CalendarioSanitarioView({
             </div>
 
             {modalEventDetail.observaciones && (
-              <div className="text-xs text-slate-400 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
-                <strong className="text-slate-300 block mb-1">Notas técnicas / Observaciones:</strong>
+              <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <strong className="text-slate-800 block mb-1">Notas técnicas / Observaciones:</strong>
                 <p className="italic">{modalEventDetail.observaciones}</p>
               </div>
             )}
@@ -2926,17 +2926,17 @@ export default function CalendarioSanitarioView({
                 })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-sky-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
+                className="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 text-sky-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition shadow-2xs"
                 title="Agendar en el calendario de Google en celular o PC con recordatorio"
               >
                 <span>📅 Agendar en mi Calendar</span>
               </a>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
               {modalEventDetail.source === 'siembra' ? (
                 <div className="flex flex-wrap items-center justify-between w-full gap-2">
-                  <span className="text-[11px] text-cyan-400/90 font-medium flex items-center gap-1">
+                  <span className="text-[11px] text-cyan-800 font-medium flex items-center gap-1">
                     <Sprout className="w-3.5 h-3.5" /> Sincronizado desde Siembras
                   </span>
                   <button
@@ -2951,7 +2951,7 @@ export default function CalendarioSanitarioView({
                         action: 'edit',
                       });
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-700 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                   >
                     <Sprout className="w-4 h-4" />
                     <span>Abrir en Siembras →</span>
@@ -2959,7 +2959,7 @@ export default function CalendarioSanitarioView({
                 </div>
               ) : modalEventDetail.source === 'tarea' ? (
                 <div className="flex flex-wrap items-center justify-between w-full gap-2">
-                  <span className="text-[11px] text-purple-400/90 font-medium flex items-center gap-1">
+                  <span className="text-[11px] text-purple-800 font-medium flex items-center gap-1">
                     <ClipboardList className="w-3.5 h-3.5" /> Sincronizado desde Tareas
                   </span>
                   <button
@@ -2972,7 +2972,7 @@ export default function CalendarioSanitarioView({
                         action: 'edit',
                       });
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                   >
                     <ClipboardList className="w-4 h-4" />
                     <span>Abrir en Tareas →</span>
@@ -2980,17 +2980,17 @@ export default function CalendarioSanitarioView({
                 </div>
               ) : modalEventDetail.source === 'proveedor' ? (
                 <div className="flex flex-wrap items-center justify-between w-full gap-2">
-                  <span className="text-[11px] text-amber-400/90 font-medium flex items-center gap-1">
+                  <span className="text-[11px] text-amber-800 font-medium flex items-center gap-1">
                     <Truck className="w-3.5 h-3.5" /> Proveedor & Logística
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleToggleRealizado(modalEventDetail)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer ${
                         modalEventDetail.realizado
-                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-300'
-                          : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          ? 'bg-white hover:bg-slate-50 text-amber-800 border border-slate-300'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                       }`}
                     >
                       <Check className="w-4 h-4" />
@@ -3002,7 +3002,7 @@ export default function CalendarioSanitarioView({
                         setModalEventDetail(null);
                         onNavigate?.('insumos', { subTab: 'proveedores_esperados' });
                       }}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                     >
                       <Truck className="w-4 h-4" />
                       <span>Ver en Insumos →</span>
@@ -3017,16 +3017,16 @@ export default function CalendarioSanitarioView({
                       onClick={() => {
                         setEditingEvento(modalEventDetail.raw);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-emerald-400" />
+                      <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Editar</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleDeleteEvento(modalEventDetail)}
-                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 cursor-pointer"
+                      className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 cursor-pointer transition shadow-2xs"
                       title="Eliminar protocolo"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -3045,7 +3045,7 @@ export default function CalendarioSanitarioView({
                             action: 'reproductivo',
                           });
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-700/60 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                         title="Ver ficha reproductiva del rodeo"
                       >
                         <Tags className="w-3.5 h-3.5" />
@@ -3057,10 +3057,10 @@ export default function CalendarioSanitarioView({
                   <button
                     type="button"
                     onClick={() => handleToggleRealizado(modalEventDetail)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer ${
                       modalEventDetail.realizado
-                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        ? 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                     }`}
                   >
                     <Check className="w-4 h-4" />
@@ -3080,27 +3080,27 @@ export default function CalendarioSanitarioView({
       {/* ========================================================================= */}
       {modalWeekProveedores && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={() => setModalWeekProveedores(null)}
         >
           <div
-            className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col"
+            className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col text-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                     <span>Proveedores y Servicios de la Semana</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono font-bold">
                       {modalWeekProveedores.items?.length || 0}
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400 font-medium">
+                  <p className="text-xs text-slate-500 font-medium">
                     Semana del {modalWeekProveedores.weekLabel}
                   </p>
                 </div>
@@ -3108,7 +3108,7 @@ export default function CalendarioSanitarioView({
               <button
                 type="button"
                 onClick={() => setModalWeekProveedores(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3122,28 +3122,28 @@ export default function CalendarioSanitarioView({
                 return (
                   <div
                     key={prov.id}
-                    className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 hover:border-amber-500/40 transition space-y-3"
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:border-amber-400 transition space-y-3 shadow-2xs"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                          <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
                             <span className="text-base">🚚</span>
                             <span>{prov.raw?.proveedor_o_rubro || prov.producto || prov.title}</span>
                           </h4>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10.5px] font-black border ${
                               isRecibido
-                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/70'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                                 : prov.raw?.estado === 'En Camino'
-                                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-600/70'
-                                : 'bg-amber-950/80 text-amber-300 border-amber-600/70'
+                                ? 'bg-cyan-50 text-cyan-800 border-cyan-300'
+                                : 'bg-amber-50 text-amber-800 border-amber-300'
                             }`}
                           >
                             {isRecibido ? '✓ Recibido en Campo' : prov.raw?.estado || 'Esperando'}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-400 font-medium mt-1">
+                        <div className="text-xs text-slate-500 font-medium mt-1">
                           📅 {prov.labelRango || formatFechaAR(prov.date)}
                         </div>
                       </div>
@@ -3151,31 +3151,31 @@ export default function CalendarioSanitarioView({
 
                     {/* Indicaciones y Notas */}
                     {(prov.raw?.indicaciones || prov.raw?.notas) && (
-                      <div className="text-xs bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1">
+                      <div className="text-xs bg-white p-2.5 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
                         {prov.raw?.indicaciones && (
                           <div>
-                            <span className="text-slate-400 font-bold">Indicaciones: </span>
-                            <span className="text-slate-200">{prov.raw.indicaciones}</span>
+                            <span className="text-slate-500 font-bold">Indicaciones: </span>
+                            <span className="text-slate-800">{prov.raw.indicaciones}</span>
                           </div>
                         )}
                         {prov.raw?.notas && (
                           <div>
-                            <span className="text-slate-400 font-bold">Notas: </span>
-                            <span className="text-slate-300 italic">{prov.raw.notas}</span>
+                            <span className="text-slate-500 font-bold">Notas: </span>
+                            <span className="text-slate-700 italic">{prov.raw.notas}</span>
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Botones de acción individual por proveedor */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => handleToggleRealizado(prov)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm ${
                           isRecibido
-                            ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700'
-                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            ? 'bg-white hover:bg-slate-50 text-amber-800 border border-slate-300'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                         }`}
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -3189,7 +3189,7 @@ export default function CalendarioSanitarioView({
                             setModalWeekProveedores(null);
                             setModalEventDetail(prov);
                           }}
-                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition cursor-pointer shadow-2xs"
                         >
                           Ver Detalle
                         </button>
@@ -3199,7 +3199,7 @@ export default function CalendarioSanitarioView({
                             setModalWeekProveedores(null);
                             onNavigate?.('insumos', { subTab: 'proveedores_esperados' });
                           }}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1 transition cursor-pointer shadow-sm"
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1 transition cursor-pointer shadow-sm"
                         >
                           <Truck className="w-3.5 h-3.5" />
                           <span>Ver en Insumos →</span>
@@ -3212,14 +3212,14 @@ export default function CalendarioSanitarioView({
             </div>
 
             {/* Footer */}
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
                 Podés gestionar insumos y acopios desde la solapa Insumos.
               </span>
               <button
                 type="button"
                 onClick={() => setModalWeekProveedores(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer shadow-2xs"
               >
                 Cerrar
               </button>
@@ -3232,22 +3232,22 @@ export default function CalendarioSanitarioView({
       {/* MODAL 2: FORMULARIO NUEVO PROTOCOLO SANITARIO                             */}
       {/* ========================================================================= */}
       {modalNewOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <form
             onSubmit={handleCreateEvento}
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4"
+            className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 text-slate-900"
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
                   <Syringe className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-white">Agendar Nuevo Protocolo Sanitario</h3>
+                <h3 className="text-base font-bold text-slate-900">Agendar Nuevo Protocolo Sanitario</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setModalNewOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3255,13 +3255,13 @@ export default function CalendarioSanitarioView({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Tipo de Evento
                 </label>
                 <select
                   value={newEvento.tipo}
                   onChange={(e) => setNewEvento({ ...newEvento, tipo: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 >
                   {TIPOS_EVENTO.map((t) => (
                     <option key={t} value={t}>
@@ -3272,7 +3272,7 @@ export default function CalendarioSanitarioView({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Fecha Programada *
                 </label>
                 <input
@@ -3280,12 +3280,12 @@ export default function CalendarioSanitarioView({
                   required
                   value={newEvento.fecha_programada}
                   onChange={(e) => setNewEvento({ ...newEvento, fecha_programada: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Nombre del Protocolo / Vacuna / Manejo *
                 </label>
                 <input
@@ -3294,12 +3294,12 @@ export default function CalendarioSanitarioView({
                   placeholder="Ej: Aftosa 2da Campaña / Refuerzo Clostridial..."
                   value={newEvento.nombre_protocolo}
                   onChange={(e) => setNewEvento({ ...newEvento, nombre_protocolo: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Producto Comercial
                 </label>
                 <input
@@ -3307,12 +3307,12 @@ export default function CalendarioSanitarioView({
                   placeholder="Ej: Biostar / Rotatec / Suplenut"
                   value={newEvento.producto_sugerido}
                   onChange={(e) => setNewEvento({ ...newEvento, producto_sugerido: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Dosis y Vía de Aplicación
                 </label>
                 <input
@@ -3320,12 +3320,12 @@ export default function CalendarioSanitarioView({
                   placeholder="Ej: 5 ml SC / 2 ml IM"
                   value={newEvento.dosis_via}
                   onChange={(e) => setNewEvento({ ...newEvento, dosis_via: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Categoría Destino
                 </label>
                 <input
@@ -3333,12 +3333,12 @@ export default function CalendarioSanitarioView({
                   placeholder="Ej: Terneros al pie / Vientres"
                   value={newEvento.categoria_destino}
                   onChange={(e) => setNewEvento({ ...newEvento, categoria_destino: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Rodeo a Aplicar
                 </label>
                 <input
@@ -3347,7 +3347,7 @@ export default function CalendarioSanitarioView({
                   placeholder="Todos los rodeos de cría"
                   value={newEvento.rodeo_aplicado}
                   onChange={(e) => setNewEvento({ ...newEvento, rodeo_aplicado: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
                 <datalist id="rodeos-list-modal">
                   <option value="Todos los rodeos de cría" />
@@ -3358,7 +3358,7 @@ export default function CalendarioSanitarioView({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Observaciones / Instrucciones de Manga
                 </label>
                 <textarea
@@ -3366,23 +3366,23 @@ export default function CalendarioSanitarioView({
                   placeholder="Instrucciones para la cuadrilla, jeringas, cadena de frío..."
                   value={newEvento.observaciones}
                   onChange={(e) => setNewEvento({ ...newEvento, observaciones: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setModalNewOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition shadow-2xs"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-700/20 flex items-center gap-1.5 cursor-pointer transition"
               >
                 <Check className="w-4 h-4" />
                 <span>Agendar Protocolo</span>
@@ -3396,20 +3396,20 @@ export default function CalendarioSanitarioView({
       {/* MODAL 3: EDICIÓN COMPLETA DE PROTOCOLO EXISTENTE                         */}
       {/* ========================================================================= */}
       {editingEvento && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveEditEvento}
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4"
+            className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 text-slate-900"
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">Editar Protocolo Sanitario</h3>
+                <Edit3 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-base font-bold text-slate-900">Editar Protocolo Sanitario</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingEvento(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3417,11 +3417,11 @@ export default function CalendarioSanitarioView({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Tipo</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Tipo</label>
                 <select
                   value={editingEvento.tipo}
                   onChange={(e) => setEditingEvento({ ...editingEvento, tipo: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 >
                   {TIPOS_EVENTO.map((t) => (
                     <option key={t} value={t}>
@@ -3432,19 +3432,19 @@ export default function CalendarioSanitarioView({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Fecha</label>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">Fecha</label>
                 <input
                   type="date"
                   value={editingEvento.fecha_programada || ''}
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, fecha_programada: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Nombre del Protocolo
                 </label>
                 <input
@@ -3454,12 +3454,12 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, nombre_protocolo: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Producto Comercial
                 </label>
                 <input
@@ -3468,12 +3468,12 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, producto_sugerido: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Dosis y Vía
                 </label>
                 <input
@@ -3482,12 +3482,12 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, dosis_via: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Categoría Destino
                 </label>
                 <input
@@ -3496,12 +3496,12 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, categoria_destino: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Rodeo Aplicado
                 </label>
                 <input
@@ -3510,12 +3510,12 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, rodeo_aplicado: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                   Observaciones
                 </label>
                 <textarea
@@ -3524,23 +3524,23 @@ export default function CalendarioSanitarioView({
                   onChange={(e) =>
                     setEditingEvento({ ...editingEvento, observaciones: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setEditingEvento(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition shadow-2xs"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-700/20 flex items-center gap-1.5 cursor-pointer transition"
               >
                 <Check className="w-4 h-4" />
                 <span>Guardar Cambios</span>

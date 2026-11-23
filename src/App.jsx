@@ -2096,22 +2096,22 @@ export default function App() {
                 {/* Popover Flotante Global con z-[9999] para evitar cualquier recorte de overflow */}
                 {showPreciosHaciendaModal && (
                   <div
-                    className="fixed inset-0 z-[9999] flex items-start justify-center sm:justify-start sm:pl-64 lg:pl-72 pt-14 p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+                    className="fixed inset-0 z-[9999] flex items-start justify-center sm:justify-start sm:pl-64 lg:pl-72 pt-14 p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
                     onClick={() => setShowPreciosHaciendaModal(false)}
                   >
                     <div
-                      className="relative w-full max-w-sm rounded-2xl bg-slate-900 text-white text-xs shadow-2xl border border-slate-700 p-4 space-y-3.5 select-none"
+                      className="relative w-full max-w-sm rounded-2xl bg-white text-slate-900 text-xs shadow-2xl border border-slate-200 p-4 space-y-3.5 select-none"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">🐄</span>
                           <div>
-                            <div className="font-black text-xs text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                            <div className="font-black text-xs text-emerald-800 uppercase tracking-wide flex items-center gap-1.5">
                               <span>Pizarra Hacienda (MAG / Rosgan)</span>
-                              <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Nov 2026</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">Nov 2026</span>
                             </div>
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-[10px] text-slate-500">
                               Precios $/kg vivo de referencia para el Copilot IA
                             </div>
                           </div>
@@ -2119,7 +2119,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setShowPreciosHaciendaModal(false)}
-                          className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                          className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                           title="Cerrar ventana"
                         >
                           <X className="w-4 h-4" />
@@ -2127,13 +2127,13 @@ export default function App() {
                       </div>
 
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                        <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                           <div>
-                            <label className="text-xs font-bold text-slate-200 block">Ternero Invernada</label>
-                            <span className="text-[10px] text-slate-400">160 - 180 kg</span>
+                            <label className="text-xs font-bold text-slate-800 block">Ternero Invernada</label>
+                            <span className="text-[10px] text-slate-500">160 - 180 kg</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-400 font-bold">$</span>
+                            <span className="text-xs text-slate-500 font-bold">$</span>
                             <NumericInput
                               value={editandoPreciosHacienda.ternero_kg_ars || ''}
                               onChange={(val) =>
@@ -2143,19 +2143,19 @@ export default function App() {
                                 })
                               }
                               allowDecimals={false}
-                              className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
+                              className="w-24 bg-white text-slate-900 font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs tabular-nums"
                             />
-                            <span className="text-[10px] text-slate-400 font-mono">/kg</span>
+                            <span className="text-[10px] text-slate-500 font-mono">/kg</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                        <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                           <div>
-                            <label className="text-xs font-bold text-slate-200 block">Novillito / Consumo</label>
-                            <span className="text-[10px] text-slate-400">Gordo liviano</span>
+                            <label className="text-xs font-bold text-slate-800 block">Novillito / Consumo</label>
+                            <span className="text-[10px] text-slate-500">Gordo liviano</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-400 font-bold">$</span>
+                            <span className="text-xs text-slate-500 font-bold">$</span>
                             <NumericInput
                               value={editandoPreciosHacienda.novillito_kg_ars || ''}
                               onChange={(val) =>
@@ -2165,19 +2165,19 @@ export default function App() {
                                 })
                               }
                               allowDecimals={false}
-                              className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
+                              className="w-24 bg-white text-slate-900 font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs tabular-nums"
                             />
-                            <span className="text-[10px] text-slate-400 font-mono">/kg</span>
+                            <span className="text-[10px] text-slate-500 font-mono">/kg</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                        <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                           <div>
-                            <label className="text-xs font-bold text-slate-200 block">Vaca</label>
-                            <span className="text-[10px] text-slate-400">Invernada / Descarte</span>
+                            <label className="text-xs font-bold text-slate-800 block">Vaca</label>
+                            <span className="text-[10px] text-slate-500">Invernada / Descarte</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-400 font-bold">$</span>
+                            <span className="text-xs text-slate-500 font-bold">$</span>
                             <NumericInput
                               value={editandoPreciosHacienda.vaca_kg_ars || ''}
                               onChange={(val) =>
@@ -2187,19 +2187,19 @@ export default function App() {
                                 })
                               }
                               allowDecimals={false}
-                              className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
+                              className="w-24 bg-white text-slate-900 font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs tabular-nums"
                             />
-                            <span className="text-[10px] text-slate-400 font-mono">/kg</span>
+                            <span className="text-[10px] text-slate-500 font-mono">/kg</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                        <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                           <div>
-                            <label className="text-xs font-bold text-slate-200 block">Toro</label>
-                            <span className="text-[10px] text-slate-400">Manufactura / Descarte</span>
+                            <label className="text-xs font-bold text-slate-800 block">Toro</label>
+                            <span className="text-[10px] text-slate-500">Manufactura / Descarte</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-400 font-bold">$</span>
+                            <span className="text-xs text-slate-500 font-bold">$</span>
                             <NumericInput
                               value={editandoPreciosHacienda.toro_kg_ars || ''}
                               onChange={(val) =>
@@ -2209,24 +2209,24 @@ export default function App() {
                                 })
                               }
                               allowDecimals={false}
-                              className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
+                              className="w-24 bg-white text-slate-900 font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 text-xs tabular-nums"
                             />
-                            <span className="text-[10px] text-slate-400 font-mono">/kg</span>
+                            <span className="text-[10px] text-slate-500 font-mono">/kg</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+                      <div className="pt-2 border-t border-slate-200 flex flex-col gap-2">
                         <button
                           type="button"
                           disabled={consultandoPreciosIA}
                           onClick={handleConsultarHaciendaWebIA}
-                          className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white font-bold text-xs border border-slate-700 flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50 cursor-pointer"
+                          className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs border border-sky-200 flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50 cursor-pointer shadow-2xs"
                           title="Consultar cotizaciones vigentes del MAG y remates en internet con Gemini IA"
                         >
                           {consultandoPreciosIA ? (
                             <>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
                               <span>Buscando cotizaciones en la web...</span>
                             </>
                           ) : (
@@ -2240,14 +2240,14 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setShowPreciosHaciendaModal(false)}
-                            className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-semibold transition cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
                           >
                             Cancelar
                           </button>
                           <button
                             type="button"
                             onClick={handleGuardarPreciosHacienda}
-                            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
+                            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
                           >
                             <span>✓ Guardar Precios</span>
                           </button>
