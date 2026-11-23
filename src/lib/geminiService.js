@@ -2550,8 +2550,9 @@ export async function analizarRecetaORemitoSiembra(
     const rawReceta = await extraerRecetaAgronomica(items, { potrerosList, contextoUsuario });
     const resultadoReceta = calcularAritmeticaReceta(rawReceta, potrerosList);
 
-    // Si no se extrajo ningún lote ni producto (por ejemplo si el documento en realidad era una cotización)
-    if ((!resultadoReceta.lotes || resultadoReceta.lotes.length === 0) && items.length > 0) {
+    // Si no se extrajo ningún insumo (por ejemplo si el documento en realidad era una cotización o lista de precios)
+    const tieneInsumos = Array.isArray(resultadoReceta?.lotes?.[0]?.insumos) && resultadoReceta.lotes[0].insumos.length > 0;
+    if (!tieneInsumos && items.length > 0) {
       try {
         const rawCotiz = await extraerFacturaOCotizacion(items, { contextoUsuario });
         const resCotiz = calcularAritmeticaFacturaOCotizacion(rawCotiz);

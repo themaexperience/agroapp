@@ -38,6 +38,7 @@ import { supabase } from '../lib/supabase';
 import { formatFechaAR } from '../utils/dateHelper';
 import { confirmAction } from './ConfirmDialog';
 import { analizarRecetaORemitoSiembra, hasGeminiKey, compressImage } from '../lib/geminiService';
+import { extraerInsumosYRecetaMultimodal } from '../utils/gemini.js';
 import {
   buscarUltimoPrecioInsumo,
   buscarUltimoPrecioLabor,
@@ -3515,86 +3516,138 @@ function SiembraEditModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setScanLoading(true);
-    setScanMsg('Analizando documento con Gemini 2.5 Pro (' + file.name + ')...');
+    setScanMsg('Analizando documento con Gemini 2.5 Flash (' + file.name + ')...');
     try {
-      const res = await analizarRecetaORemitoSiembra([file], potreros, false);
-      const rawLotes = Array.isArray(res?.lotes) ? res.lotes : [];
-      const lote = rawLotes[0] || {};
-      const fallbackInsumos = Array.isArray(res?.compras_generales_campana) && res.compras_generales_campana.length > 0
-        ? res.compras_generales_campana
-        : Array.isArray(res?.productos) && res.productos.length > 0
-          ? res.productos
-          : Array.isArray(res?.items) && res.items.length > 0
-            ? res.items
-            : [];
-      const insumosList = (Array.isArray(lote.insumos) && lote.insumos.length > 0)
-        ? lote.insumos
-        : fallbackInsumos;
+      let res = null;
+      try {
+        res = await extraerInsumosYRecetaMultimodal(file, {
+          potreros,
+          totHa: totHaActual,
+        });
+      } catch (multiErr) {
+        console.warn('Fallo extractor multimodal directo, intentando fallback:', multiErr);
+        res = await analizarRecetaORemitoSiembra([file], potreros, false);
+      }
 
-      if ((scanTargetSection === 'insumos' || scanTargetSection === 'receta') && insumosList.length > 0) {
-        const nuevos = insumosList.map((ins) => {
-          const pres = findPresentacion(ins.unidad || ins.presentacion);
+      // Normalizar array de items devueltos por Gemini
+      const rawItems = Array.isArray(res?.items) && res.items.length > 0
+        ? res.items
+        : Array.isArray(res?.productos) && res.productos.length > 0
+        ? res.productos
+        : Array.isArray(res?.compras_generales_campana) && res.compras_generales_campana.length > 0
+        ? res.compras_generales_campana
+        : Array.isArray(res?.lotes?.[0]?.insumos) && res.lotes[0].insumos.length > 0
+        ? res.lotes[0].insumos
+        : [];
+
+      const insumosItems = rawItems.filter(
+        (it) => (it.categoria || '').toLowerCase() !== 'labor'
+      );
+      const laboresItems = rawItems.filter(
+        (it) => (it.categoria || '').toLowerCase() === 'labor'
+      );
+
+      let importadosInsumos = 0;
+      let importadasLabores = 0;
+
+      // 1. IMPORTAR INSUMOS (Semillas, Fertilizantes, Agroquímicos)
+      if ((scanTargetSection === 'insumos' || scanTargetSection === 'receta' || laboresItems.length === 0) && insumosItems.length > 0) {
+        const nuevos = insumosItems.map((ins) => {
+          const pres = findPresentacion(ins.presentacion || ins.unidad);
           const hasEnv = !!(pres.envase && pres.factor > 1);
           let cant = Number(ins.cantidad_total || ins.cantidad || 0);
-          if (hasEnv && cant > 50 && pres.factor > 1) {
-            cant = Math.ceil(cant / pres.factor);
+          let dosisHa = Number(ins.dosis_ha) || 0;
+
+          // Si viene dosis por hectárea pero no cantidad total
+          if (dosisHa > 0 && cant <= 0 && totHaActual > 0) {
+            const totBase = dosisHa * totHaActual;
+            cant = hasEnv ? Math.ceil(totBase / pres.factor) : Math.round(totBase * 100) / 100;
+          } else if (cant > 0 && dosisHa <= 0 && totHaActual > 0) {
+            // Si viene cantidad total (ej. 10 bolsas) pero no dosis
+            dosisHa = hasEnv ? (cant * pres.factor) / totHaActual : cant / totHaActual;
           }
-          const dosisHa = Number(ins.dosis_ha) || (totHaActual > 0 && cant > 0 ? (hasEnv ? (cant * pres.factor) / totHaActual : cant / totHaActual) : 1);
+
+          const modoCalculo = dosisHa > 0 ? 'dosis' : 'total';
+          const cantFinal = cant > 0 ? cant : (modoCalculo === 'total' ? 1 : '');
           const pUnit = Number(ins.precio_unitario) || 0;
-          const pLower = (ins.producto || ins.nombre || '').toLowerCase();
+          const pLower = (ins.nombre || ins.producto || '').toLowerCase();
           const fLower = (ins.funcion || '').toLowerCase();
-          const tipo = fLower.includes('semilla') || pLower.includes('semilla') || dosisHa > 15
-            ? 'Semilla'
-            : (fLower.includes('fertiliz') || pLower.includes('urea') || pLower.includes('fosfato') ? 'Fertilizante' : 'Agroquímico');
+          const cat = ins.categoria;
+          const tipo = (cat === 'Semilla' || cat === 'Fertilizante' || cat === 'Agroquímico')
+            ? cat
+            : (fLower.includes('semilla') || pLower.includes('semilla') || (dosisHa > 15 && modoCalculo === 'dosis')
+              ? 'Semilla'
+              : (fLower.includes('fertiliz') || pLower.includes('urea') || pLower.includes('fosfato') ? 'Fertilizante' : 'Agroquímico'));
 
           return {
             id: Math.random().toString(36).slice(2, 9),
-            fecha: lote.fecha_estimada || new Date().toISOString().slice(0, 10),
-            remito: res?.remito_o_receta_nro || res?.presupuesto_nro || '',
-            proveedor: res?.ingeniero_o_proveedor || res?.cooperativa || '',
+            fecha: res?.fecha || new Date().toISOString().slice(0, 10),
+            remito: res?.numero_comprobante || res?.remito_o_receta_nro || res?.presupuesto_nro || '',
+            proveedor: res?.proveedor_o_emisor || res?.ingeniero_o_proveedor || res?.cooperativa || '',
             tipo,
-            producto: ins.producto || ins.nombre || '',
+            producto: ins.nombre || ins.producto || '',
             presentacion: pres.id,
-            modo_calculo: dosisHa > 0 ? 'dosis' : 'total',
+            modo_calculo: modoCalculo,
             dosis_ha: dosisHa > 0 ? Math.round(dosisHa * 100) / 100 : '',
-            cantidad: cant > 0 ? cant : '',
+            cantidad: cantFinal,
             unidad: pres.unidadBase,
             dosis_real: dosisHa > 0 ? Math.round(dosisHa * 100) / 100 : 1,
             precio_unitario: pUnit > 0 ? pUnit : '',
-            moneda: res?.moneda || ins.moneda || 'USD',
+            moneda: ins.moneda || res?.moneda || 'USD',
             costo_usd: 0,
             costo_ars: 0,
           };
         });
+
         setForm((prev) => {
           const updated = [...prev.insumos_json, ...nuevos];
           return {
             ...prev,
             insumos_json: updated,
             receta_json: updated,
+            contratista: prev.contratista || res?.proveedor_o_emisor || prev.contratista,
           };
         });
-        if (notify) notify('Se importaron ' + nuevos.length + ' insumos desde el documento con Gemini IA.', 'success');
-      } else if (scanTargetSection === 'labores' && Array.isArray(lote.labores_detalle) && lote.labores_detalle.length > 0) {
-        const nuevos = lote.labores_detalle.map((lab) => {
-          const subUsd = res?.moneda === 'ARS'
-            ? (Number(lab.subtotal) || 0) / (Number(dolarRef) || 1665)
-            : Number(lab.subtotal) || 0;
+        importadosInsumos = nuevos.length;
+      }
+
+      // 2. IMPORTAR LABORES (si vienen labores en el documento o se escaneó la sección de labores)
+      const rawLabores = laboresItems.length > 0
+        ? laboresItems
+        : Array.isArray(res?.lotes?.[0]?.labores_detalle)
+        ? res.lotes[0].labores_detalle
+        : [];
+
+      if ((scanTargetSection === 'labores' || insumosItems.length === 0) && rawLabores.length > 0) {
+        const nuevasLabores = rawLabores.map((lab) => {
+          const haLab = Number(lab.cantidad_total || lab.hectareas) || totHaActual;
+          const tarifa = Number(lab.precio_unitario) || 0;
+          const subUsd = (lab.moneda || res?.moneda) === 'ARS'
+            ? (haLab * tarifa) / (Number(dolarRef) || 1665)
+            : (haLab * tarifa);
           return {
-            fecha: lote.fecha_estimada || new Date().toISOString().slice(0, 10),
-            labor: lab.concepto || 'Labor Agrícola',
-            contratista: res?.ingeniero_o_proveedor || 'Contratista',
-            ha: Number(lab.hectareas) || totHaActual,
-            tarifa_ha: Number(lab.precio_unitario) || 0,
-            moneda: res?.moneda || 'USD',
+            fecha: res?.fecha || new Date().toISOString().slice(0, 10),
+            labor: lab.nombre || lab.concepto || 'Labor Agrícola',
+            contratista: res?.proveedor_o_emisor || res?.ingeniero_o_proveedor || 'Contratista',
+            ha: haLab,
+            tarifa_ha: tarifa,
+            moneda: lab.moneda || res?.moneda || 'USD',
             subtotal_usd: Math.round(subUsd * 100) / 100,
           };
         });
         setForm((prev) => ({
           ...prev,
-          labores_json: [...prev.labores_json, ...nuevos],
+          labores_json: [...prev.labores_json, ...nuevasLabores],
         }));
-        if (notify) notify('Se importaron ' + nuevos.length + ' labores agrícolas con Gemini IA.', 'success');
+        importadasLabores = nuevasLabores.length;
+      }
+
+      // Mensaje de estado final
+      if (importadosInsumos > 0 || importadasLabores > 0) {
+        const msg = [];
+        if (importadosInsumos > 0) msg.push(`${importadosInsumos} insumos`);
+        if (importadasLabores > 0) msg.push(`${importadasLabores} labores`);
+        if (notify) notify(`Se importaron ${msg.join(' y ')} desde el documento con Gemini 2.5 Flash.`, 'success');
       } else {
         if (notify) notify('El documento fue analizado pero no contenía datos estructurados para ' + scanTargetSection + '.', 'warning');
       }
