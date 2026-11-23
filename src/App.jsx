@@ -159,6 +159,8 @@ export default function App() {
       return 'admin';
     }
   });
+  const isProductionMode = appMode === 'produccion';
+  const isEconomicMode = !isProductionMode && (appMode === 'admin' || appMode === 'gestion');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -1400,8 +1402,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Dólar de Referencia & Candado en Sidebar (Solo Modo Admin) */}
-                {appMode === 'admin' && (
+                {/* 2. Dólar de Referencia & Candado en Sidebar (Solo Modo Admin / Gestión) */}
+                {isEconomicMode && (
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
@@ -1469,8 +1471,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2.b Pizarra de Hacienda (MAG / Rosgan) en Sidebar Móvil (Solo Modo Admin) */}
-                {appMode === 'admin' && (
+                {/* 2.b Pizarra de Hacienda (MAG / Rosgan) en Sidebar Móvil (Solo Modo Admin / Gestión) */}
+                {isEconomicMode && (
                   <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/90 shadow-2xs space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-emerald-950 flex items-center gap-1">
@@ -1519,7 +1521,7 @@ export default function App() {
                       onClick={() => {
                         setAppMode('produccion');
                         try { localStorage.setItem('sanjose_app_mode', 'produccion'); } catch {}
-                        if (activeTab === 'costos') setActiveTab('inicio');
+                        if (activeTab === 'costos' || activeTab === 'ventas' || activeTab === 'informes') navigateTab('inicio');
                         notify('Modo Producción activado.', 'info');
                       }}
                       className={`py-1.5 px-2 rounded-md text-xs font-bold flex items-center justify-center gap-1 transition ${
@@ -1939,7 +1941,7 @@ export default function App() {
             </div>
 
             {/* 3. COTIZACIÓN DÓLAR COMPACTA (Solo Modo Admin / Gestión) */}
-            {appMode === 'admin' && (
+            {isEconomicMode && (
               <div className="relative shrink-0">
                 <div
                   className="h-8 px-2.5 py-1 rounded-xl bg-amber-50/90 hover:bg-amber-50 border border-amber-300 text-amber-950 shadow-2xs transition inline-flex items-center gap-1.5 text-xs font-medium"
@@ -2068,7 +2070,7 @@ export default function App() {
             )}
 
             {/* 3.b PIZARRA HACIENDA DE REFERENCIA (MAG CAÑUELAS / ROSGAN) (Solo Modo Admin / Gestión) */}
-            {appMode === 'admin' && (
+            {isEconomicMode && (
               <div className="relative shrink-0">
                 <button
                   type="button"
@@ -2271,7 +2273,7 @@ export default function App() {
                   try {
                     localStorage.setItem('sanjose_app_mode', 'produccion');
                   } catch {}
-                  if (activeTab === 'costos') navigateTab('inicio');
+                  if (activeTab === 'costos' || activeTab === 'ventas' || activeTab === 'informes') navigateTab('inicio');
                   notify('Modo Producción activado.', 'info');
                 }}
                 className={`h-full px-2 py-0.5 rounded-lg text-xs font-medium flex items-center gap-1 transition whitespace-nowrap cursor-pointer ${
