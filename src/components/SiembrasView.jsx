@@ -3214,6 +3214,7 @@ function SiembraEditModal({
     estado: siembra.estado || 'Sembrado',
     fecha: siembra.fecha || new Date().toISOString().slice(0, 10),
     observaciones: siembra.observaciones || '',
+    indicaciones_caldo: siembra.indicaciones_caldo || '',
     receta_json: initInsumosUnificados,
     insumos_json: initInsumosUnificados,
     labores_json: Array.isArray(siembra.labores_json) ? [...siembra.labores_json] : [],
@@ -4505,6 +4506,21 @@ function SiembraEditModal({
                 })}
               </div>
             )}
+
+            {/* Campo opcional: Indicaciones de Caldo / Dilución */}
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <span>💧</span>
+                <span>Indicaciones de Caldo / Dilución (opcional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: Caldo 60 L/ha con coadyuvante al 0.5%, pastilla cono hueco a 3 bar..."
+                value={form.indicaciones_caldo || ''}
+                onChange={(e) => setForm({ ...form, indicaciones_caldo: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
           </div>
 
           {/* SECCIÓN 3: Labores Agrícolas & Contratista */}
