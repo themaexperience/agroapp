@@ -40,6 +40,7 @@ import {
   Target,
   Search,
   Filter,
+  MoreVertical,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { LAS_FLORES_CENTER, parseGeoFileContent } from '../utils/geoParser';
@@ -1594,6 +1595,7 @@ export default function MapaPotrerosView({
   const quickMarkTypeRef = useRef(null);
   quickMarkTypeRef.current = quickMarkType;
   const [showQuickMarkMenu, setShowQuickMarkMenu] = useState(false);
+  const [activeInfraMenuId, setActiveInfraMenuId] = useState(null); // ID de infraestructura con menú ⋮ abierto
   const [showNewPointModal, setShowNewPointModal] = useState(false);
   const [pendingPointCoords, setPendingPointCoords] = useState(null);
   const [newPointForm, setNewPointForm] = useState({
@@ -2254,8 +2256,13 @@ export default function MapaPotrerosView({
     const t2 = setTimeout(triggerRedraw, 400);
 
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isExpanded) {
-        setIsExpanded(false);
+      if (e.key === 'Escape') {
+        if (activeInfraMenuId !== null) {
+          setActiveInfraMenuId(null);
+        }
+        if (isExpanded) {
+          setIsExpanded(false);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -2265,7 +2272,7 @@ export default function MapaPotrerosView({
       clearTimeout(t2);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isExpanded]);
+  }, [isExpanded, activeInfraMenuId]);
 
   // Forzar redibujado de tiles y tamaño al cambiar Modo de Vista (Contornos, Semáforo, Pasturas, Ambientes)
   useEffect(() => {
@@ -9230,165 +9237,247 @@ async function handleSaveSidePanel(e) {
                   })}
                 </div>
 
-                {/* TABLA EN DESKTOP (hidden md:block) */}
-                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-xs text-left">
+                {/* TABLA EN DESKTOP (hidden md:block) - COMPRIMIDA SIN SCROLL HORIZONTAL CON BOTÓN ⋮ */}
+                <div className="hidden md:block rounded-xl border border-slate-200 bg-white shadow-xs">
+                  <table className="w-full table-fixed text-xs text-left">
                     <thead className="bg-slate-100 text-slate-700 uppercase font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="py-3 px-3">Tipo</th>
-                        <th className="py-3 px-3">Elemento (Código · Nombre)</th>
-                        <th className="py-3 px-3">Potrero / Abastece</th>
-                        <th className="py-3 px-3">Bombeo / Sistema</th>
-                        <th className="py-3 px-3">Estado</th>
-                        <th className="py-3 px-3">GPS</th>
-                        <th className="py-3 px-3">Observaciones</th>
-                        <th className="py-3 px-3 text-right">Acciones</th>
+                        <th className="py-2.5 px-3 w-auto">Elemento</th>
+                        <th className="py-2.5 px-3 w-28">Potrero</th>
+                        <th className="py-2.5 px-3 w-32">Estado</th>
+                        <th className="py-2.5 px-3 w-28">Ubicación</th>
+                        <th className="py-2.5 px-3 w-16 text-center">⋮</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {infraFiltrada.map((inf) => {
                         const isOk = (inf.estado || 'Operativo') === 'Operativo';
+                        const emoji = getInfraEmoji(inf);
+                        const cleanNom = formatInfraTitulo(inf);
+                        const isMenuOpen = activeInfraMenuId === inf.id;
+
                         return (
-                          <tr key={inf.id} className="hover:bg-slate-50">
-                            <td className="p-2.5 font-bold text-slate-800 whitespace-nowrap">{inf.tipo}</td>
-                            <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
-                              <span className="font-mono text-sky-800 mr-1.5">{inf.codigo ? `${inf.codigo} ·` : ''}</span>
-                              <span>{inf.nombre}</span>
+                          <tr key={inf.id} className="hover:bg-slate-50 transition">
+                            {/* 1. Ícono + Nombre */}
+                            <td className="py-2.5 px-3 font-bold text-slate-900 truncate">
+                              <div className="flex items-center gap-2 min-w-0" title={`${inf.nombre} (${inf.tipo})`}>
+                                <span className="text-base shrink-0 select-none">{emoji}</span>
+                                <div className="min-w-0 truncate">
+                                  <div className="font-extrabold text-slate-900 truncate text-[12.5px] leading-tight">
+                                    {inf.codigo ? <span className="font-mono text-sky-800 mr-1">{inf.codigo} ·</span> : null}
+                                    {cleanNom}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-medium truncate">
+                                    {inf.tipo} {inf.solarizado ? '☀️ Solar' : ''}
+                                  </div>
+                                </div>
+                              </div>
                             </td>
-                            <td className="p-2.5 text-slate-600 whitespace-nowrap">
-                              {inf.potrero_numero ? `Potrero #${inf.potrero_numero}` : ''}{' '}
-                              {inf.potreros_abastecidos || ''}
-                            </td>
-                            <td className="p-2.5 whitespace-nowrap">
-                              {inf.tipo === 'Molino' ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    window.__sanJoseToggleSolarMolino?.(inf.id, !inf.solarizado)
-                                  }
-                                  className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1 transition cursor-pointer whitespace-nowrap ${
-                                    inf.solarizado
-                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                      : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                                  }`}
-                                  title="Clic para alternar entre Bomba Sumergible Solar y Molino Viento Convencional"
-                                >
-                                  <Sun
-                                    className={`w-3 h-3 ${
-                                      inf.solarizado ? 'text-amber-500' : 'text-slate-400'
-                                    }`}
-                                  />
-                                  <span>{inf.solarizado ? 'Bomba Sumergible' : 'Viento / Solar'}</span>
-                                </button>
-                              ) : inf.componentes_detalle ? (
-                                <span className="text-[11px] font-medium text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap">
-                                  {inf.componentes_detalle}
+
+                            {/* 2. Potrero */}
+                            <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap">
+                              {inf.potrero_numero ? (
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-extrabold text-[11px] border border-slate-200">
+                                  P#{inf.potrero_numero}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 text-[11px]">-</span>
+                                <span className="text-slate-400 text-[11px] italic">General</span>
+                              )}
+                              {inf.potreros_abastecidos && (
+                                <span className="block text-[10px] text-slate-400 font-medium truncate max-w-[90px]" title={inf.potreros_abastecidos}>
+                                  {inf.potreros_abastecidos}
+                                </span>
                               )}
                             </td>
-                            <td className="p-2.5 whitespace-nowrap">
-                              <select
-                                value={inf.estado || 'Operativo'}
-                                onChange={(e) => handleUpdateInfraStatus(inf, e.target.value)}
-                                className={`px-2 py-1 rounded-lg border font-bold text-xs ${
+
+                            {/* 3. Estado (pill compacto) */}
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold border inline-flex items-center gap-1 ${
                                   isOk
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                                     : 'bg-amber-50 text-amber-900 border-amber-300'
                                 }`}
                               >
-                                {ESTADOS_INFRAESTRUCTURA.map((st) => (
-                                  <option key={st} value={st}>
-                                    {st}
-                                  </option>
-                                ))}
-                              </select>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isOk ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                {inf.estado || 'Operativo'}
+                              </span>
                             </td>
-                            <td className="p-2.5 whitespace-nowrap">
+
+                            {/* 4. Ubicación */}
+                            <td className="py-2.5 px-3 whitespace-nowrap">
                               {inf.latitud && inf.longitud ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 font-mono whitespace-nowrap shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 font-mono">
                                   <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
                                   En mapa
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0">
-                                  <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
-                                  Sin ubicar
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
+                                  Sin pin
                                 </span>
                               )}
                             </td>
-                            <td className="p-2.5 text-slate-500 truncate max-w-[180px]">{inf.observaciones || '-'}</td>
-                            <td className="p-2.5 text-right whitespace-nowrap space-x-1 shrink-0">
-                              {inf.latitud && inf.longitud ? (
+
+                            {/* 5. Botón universal ⋮ con menú flotante z-[9999] */}
+                            <td className="py-2.5 px-3 text-center whitespace-nowrap relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveInfraMenuId(isMenuOpen ? null : inf.id);
+                                }}
+                                className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                                  isMenuOpen
+                                    ? 'bg-emerald-900 text-white border-emerald-900 shadow-sm'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                                }`}
+                                title="Más opciones"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+
+                              {/* MENÚ DESPLEGABLE FLOTANTE UNIVERSAL */}
+                              {isMenuOpen && (
                                 <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleVerEnMapa(inf)}
-                                    className="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-900 font-bold inline-flex items-center gap-1 transition text-xs whitespace-nowrap shrink-0 border border-sky-200"
-                                    title="Centrar en mapa y abrir tarjeta"
+                                  <div
+                                    className="fixed inset-0 z-[9998]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveInfraMenuId(null);
+                                    }}
+                                  />
+                                  <div
+                                    className="absolute right-3 top-10 w-48 bg-slate-900/98 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700 py-1.5 z-[9999] text-left text-xs animate-in fade-in duration-100 divide-y divide-slate-800"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    <Eye className="w-3.5 h-3.5 text-sky-700 shrink-0" />
-                                    <span>Ver</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartFijarPin(inf)}
-                                    className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold inline-flex items-center gap-1 transition text-xs whitespace-nowrap shrink-0 border border-amber-200"
-                                    title="Reubicar pin en el mapa satelital"
-                                  >
-                                    <MapPin className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                    <span>Reubicar</span>
-                                  </button>
+                                    <div className="py-1">
+                                      {inf.latitud && inf.longitud ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveInfraMenuId(null);
+                                              handleVerEnMapa(inf);
+                                            }}
+                                            className="w-full px-3 py-1.5 hover:bg-slate-800 text-sky-300 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                                            <span>Ver en mapa</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveInfraMenuId(null);
+                                              handleStartFijarPin(inf);
+                                            }}
+                                            className="w-full px-3 py-1.5 hover:bg-slate-800 text-amber-300 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                          >
+                                            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                            <span>Reubicar pin en mapa</span>
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveInfraMenuId(null);
+                                            handleStartFijarPin(inf);
+                                          }}
+                                          className="w-full px-3 py-1.5 hover:bg-slate-800 text-amber-300 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                        >
+                                          <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                          <span>Ubicar pin en mapa</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveInfraMenuId(null);
+                                          setEditingInfra({ ...inf, estilo_marcador: getInfraEstilo(inf) });
+                                        }}
+                                        className="w-full px-3 py-1.5 hover:bg-slate-800 text-slate-200 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                      >
+                                        <Edit className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span>Editar datos / ícono</span>
+                                      </button>
+                                    </div>
+
+                                    {/* Cambiar Estado Rápido */}
+                                    <div className="py-1 px-3">
+                                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                                        Cambiar Estado
+                                      </label>
+                                      <select
+                                        value={inf.estado || 'Operativo'}
+                                        onChange={(e) => {
+                                          handleUpdateInfraStatus(inf, e.target.value);
+                                          setActiveInfraMenuId(null);
+                                        }}
+                                        className="w-full px-2 py-1 bg-slate-800 border border-slate-700 text-white rounded-lg text-[11px] font-bold focus:outline-none"
+                                      >
+                                        {ESTADOS_INFRAESTRUCTURA.map((st) => (
+                                          <option key={st} value={st}>
+                                            {st}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    {/* Molino: toggle solar rápido */}
+                                    {inf.tipo === 'Molino' && (
+                                      <div className="py-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            window.__sanJoseToggleSolarMolino?.(inf.id, !inf.solarizado);
+                                            setActiveInfraMenuId(null);
+                                          }}
+                                          className="w-full px-3 py-1.5 hover:bg-slate-800 text-amber-300 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                        >
+                                          <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                          <span>{inf.solarizado ? 'Pasar a Convencional' : '☀️ Marcar Solar'}</span>
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* Crear tarea / Eliminar */}
+                                    <div className="py-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveInfraMenuId(null);
+                                          onCreateTareaFromItem({
+                                            titulo: `Reparar / Revisar ${inf.tipo}: ${inf.nombre}`,
+                                            categoria:
+                                              inf.tipo === 'Tranquera' || inf.tipo === 'Tranquerón'
+                                                ? 'Alambrados'
+                                                : 'Aguadas',
+                                            potrero_numero: inf.potrero_numero || '',
+                                            infraestructura_nombre: `${inf.nombre} (${inf.tipo})`,
+                                            prioridad: 'Alta',
+                                          });
+                                        }}
+                                        className="w-full px-3 py-1.5 hover:bg-slate-800 text-emerald-300 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                      >
+                                        <ClipboardList className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                        <span>+ Asignar Tarea</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveInfraMenuId(null);
+                                          handleDeleteInfra(inf);
+                                        }}
+                                        className="w-full px-3 py-1.5 hover:bg-red-950/60 text-red-400 font-bold flex items-center gap-2 cursor-pointer transition text-left"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                        <span>Eliminar</span>
+                                      </button>
+                                    </div>
+                                  </div>
                                 </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleStartFijarPin(inf)}
-                                  className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold inline-flex items-center gap-1 shadow-2xs transition text-xs whitespace-nowrap shrink-0"
-                                  title="Fijar coordenadas con 1 clic en el mapa"
-                                >
-                                  <MapPin className="w-3.5 h-3.5 shrink-0" />
-                                  <span>Ubicar</span>
-                                </button>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => setEditingInfra({ ...inf, estilo_marcador: getInfraEstilo(inf) })}
-                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold inline-flex items-center gap-1 transition text-xs whitespace-nowrap shrink-0 border border-slate-200"
-                                title="Editar datos completos"
-                              >
-                                <Edit className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                                <span>Editar</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onCreateTareaFromItem({
-                                    titulo: `Reparar / Revisar ${inf.tipo}: ${inf.nombre}`,
-                                    categoria:
-                                      inf.tipo === 'Tranquera' || inf.tipo === 'Tranquerón'
-                                        ? 'Alambrados'
-                                        : 'Aguadas',
-                                    potrero_numero: inf.potrero_numero || '',
-                                    infraestructura_nombre: `${inf.nombre} (${inf.tipo})`,
-                                    prioridad: 'Alta',
-                                  })
-                                }
-                                className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold inline-flex items-center gap-1 transition text-xs whitespace-nowrap shrink-0 border border-emerald-300"
-                                title="Crear tarea para personal"
-                              >
-                                <ClipboardList className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                                <span>+ Tarea</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteInfra(inf)}
-                                className="p-1 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition shrink-0"
-                                title="Eliminar elemento"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
                             </td>
                           </tr>
                         );
