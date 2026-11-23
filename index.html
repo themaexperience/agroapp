@@ -571,10 +571,16 @@
             filename: mod.id,
           }).code;
 
-          // Garantía universal de export default para el cargador dinámico blob:
-          // Si un módulo solo expone exports nombrados, se le añade un export default sintético
-          // para que nunca falle con "does not provide an export named 'default'".
-          if (!/\bexport\s+default\b/.test(compiled)) {
+          // Verificar rigurosamente si el módulo ya contiene un export default (en fuente o compilado)
+          // para evitar bajo cualquier circunstancia el error "Duplicate export of 'default'".
+          const hasDefaultExport =
+            /\bexport\s+default\b/.test(source) ||
+            /\bexport\s+default\b/.test(compiled) ||
+            /\bexport\s*\{[^}]*\bdefault\b[^}]*\}/.test(source) ||
+            /\bexport\s*\{[^}]*\bdefault\b[^}]*\}/.test(compiled);
+
+          // Si el módulo no es el entrypoint (main.jsx) y carece de export default, exponer uno sintético seguro
+          if (!hasDefaultExport && mod.id !== '/src/main.jsx') {
             compiled += '\nconst __syntheticDefault = {}; export default __syntheticDefault;\n';
           }
 

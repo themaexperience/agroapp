@@ -175,6 +175,13 @@ try {
       });
     } catch (parseErr) {}
 
+    // Validación de export default duplicados
+    const defaultMatches = code.match(/\bexport\s+default\b/g) || [];
+    if (defaultMatches.length > 1) {
+      console.error(`  ✗ [EXPORT DEFAULT DUPLICADO] En ${rel}: Se encontraron ${defaultMatches.length} ocurrencias de 'export default'.`);
+      errors++;
+    }
+
     // Validación de React Hooks no importados
     const reactImports = code.match(/import\s+(?:React\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+['"]react['"];?/g) || [];
     let importedNamed = [];
