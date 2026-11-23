@@ -648,13 +648,15 @@ export default function SiembrasView({
   function handleEditSiembra(siembra) {
     const pObj = getPotrero(siembra.potrero_numero);
     const ha = Number(siembra.ha_sembradas || siembra.hectareas) || Number(pObj?.hectareas) || 40;
+    const rawInsumos = Array.isArray(siembra.insumos_json) ? [...siembra.insumos_json] : [];
+    const normalizedInsumos = rawInsumos.map((i) => normalizarInsumoRow(i, ha));
     setCurrentSiembra({
       ...siembra,
       hectareas: ha,
       ha_sembradas: ha,
       vigencia: siembra.vigencia || 'Activa',
       receta_json: Array.isArray(siembra.receta_json) ? [...siembra.receta_json] : [],
-      insumos_json: Array.isArray(siembra.insumos_json) ? [...siembra.insumos_json] : [],
+      insumos_json: normalizedInsumos,
       labores_json: Array.isArray(siembra.labores_json) ? [...siembra.labores_json] : [],
     });
     setModalEditOpen(true);
@@ -2905,6 +2907,39 @@ export const PRESENTACIONES_INSUMOS = [
   { id: 'hectarea', label: 'Hectárea (ha / labor)', unidadBase: 'ha', factor: 1, tipo: 'ha', envase: null },
 ];
 
+// Normaliza y asegura que cada fila de insumo tenga precio_unitario explícito y cantidades coherentes
+export function normalizarInsumoRow(item, totHa = 1) {
+  if (!item) return item;
+  const numPUnit = Number(String(item.precio_unitario || '').replace(',', '.'));
+  if (numPUnit > 0) return item;
+
+  // Si no tiene precio_unitario pero sí costo/subtotal previo, inferir precio_unitario inicial
+  const costoPrevio = Number(String(item.costo_usd ?? item.subtotal ?? item.subtotal_usd ?? '').replace(',', '.'));
+  if (costoPrevio > 0) {
+    const pres = findPresentacion(item.presentacion || item.unidad);
+    const hasEnvase = !!(pres.envase && pres.factor > 1);
+    const numCant = Number(String(item.cantidad || '').replace(',', '.'));
+    let cantCobro = 0;
+
+    if (numCant > 0) {
+      cantCobro = numCant;
+    } else if (item.dosis_ha && Number(item.dosis_ha) > 0) {
+      const dosis = Number(String(item.dosis_ha).replace(',', '.'));
+      const ha = Number(totHa) > 0 ? Number(totHa) : 1;
+      const totalBase = dosis * ha;
+      cantCobro = hasEnvase ? Math.ceil(totalBase / pres.factor) : totalBase;
+    }
+
+    const precioInferred = cantCobro > 0 ? Math.round((costoPrevio / cantCobro) * 100) / 100 : costoPrevio;
+    return {
+      ...item,
+      precio_unitario: precioInferred,
+    };
+  }
+
+  return item;
+}
+
 export function findPresentacion(pIdOrUnidad) {
   if (!pIdOrUnidad) return PRESENTACIONES_INSUMOS[0];
   const byId = PRESENTACIONES_INSUMOS.find((p) => p.id === pIdOrUnidad);
@@ -3001,7 +3036,9 @@ export function calcularRenglonInsumo(item, totHa, dolarRef = 1665) {
   let subtotalUsd = 0;
   let subtotalArs = 0;
 
-  if (precioUnitario > 0) {
+  // Ecuación explícita y estricta: Cantidad × Precio Unitario = Subtotal
+  // Si precioUnitario es 0, el subtotal calculado es $0,00 (sin fallbacks a subtotales residuales o viejos).
+  if (precioUnitario > 0 && cantCobro > 0) {
     if (moneda === 'USD') {
       subtotalUsd = Math.round(cantCobro * precioUnitario * 100) / 100;
       subtotalArs = Math.round(subtotalUsd * dRef * 100) / 100;
@@ -3009,9 +3046,6 @@ export function calcularRenglonInsumo(item, totHa, dolarRef = 1665) {
       subtotalArs = Math.round(cantCobro * precioUnitario * 100) / 100;
       subtotalUsd = dRef > 0 ? Math.round((subtotalArs / dRef) * 100) / 100 : 0;
     }
-  } else if (item.costo_usd !== undefined && item.costo_usd !== '' && Number(String(item.costo_usd).replace(',', '.')) > 0) {
-    subtotalUsd = Math.round(Number(String(item.costo_usd).replace(',', '.')) * 100) / 100;
-    subtotalArs = Math.round(subtotalUsd * dRef * 100) / 100;
   }
 
   const precioBase = hasEnvase && pres.factor > 1 && precioUnitario > 0
@@ -3153,7 +3187,9 @@ function SiembraEditModal({
     fecha: siembra.fecha || new Date().toISOString().slice(0, 10),
     observaciones: siembra.observaciones || '',
     receta_json: Array.isArray(siembra.receta_json) ? [...siembra.receta_json] : [],
-    insumos_json: Array.isArray(siembra.insumos_json) ? [...siembra.insumos_json] : [],
+    insumos_json: Array.isArray(siembra.insumos_json)
+      ? siembra.insumos_json.map((i) => normalizarInsumoRow(i, initHa))
+      : [],
     labores_json: Array.isArray(siembra.labores_json) ? [...siembra.labores_json] : [],
   });
 
@@ -4325,7 +4361,7 @@ function SiembraEditModal({
                             value={r.dosis_ha ?? ''}
                             onChange={(e) => updateRecetaRow(idx, 'dosis_ha', e.target.value)}
                             placeholder="Dosis"
-                            className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-emerald-400 font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-emerald-400 font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="text-[10px] text-slate-400 font-semibold shrink-0">
                             {calc.pres.unidadBase}/ha
@@ -4380,7 +4416,7 @@ function SiembraEditModal({
                               value={r.precio_unitario ?? ''}
                               onChange={(e) => updateRecetaRow(idx, 'precio_unitario', e.target.value)}
                               placeholder={calc.hasEnvase ? `Precio/${calc.pres.envase === 'bolsas' ? 'Bolsa' : 'Envase'}` : `Precio/${calc.pres.unidadBase}`}
-                              className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                           <div className="text-[9px] text-slate-400">
@@ -4456,12 +4492,12 @@ function SiembraEditModal({
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-amber-300 uppercase px-2 mb-1 tracking-wider">
+                <div className="grid grid-cols-12 gap-3 text-[10px] font-bold text-amber-300 uppercase px-2 mb-1 tracking-wider">
                   <div className="col-span-2">Fecha & Remito</div>
                   <div className="col-span-2">Producto & Proveedor</div>
                   <div className="col-span-2">Presentación / Envase</div>
                   <div className={isAdmin ? 'col-span-2' : 'col-span-3'}>Modo & Cantidad</div>
-                  {isAdmin && <div className="col-span-3 text-right">Precio Unitario & Subtotal</div>}
+                  {isAdmin && <div className="col-span-3 text-right pl-3">Precio Unitario & Subtotal</div>}
                   <div className="col-span-1 text-center">Acción</div>
                 </div>
 
@@ -4470,7 +4506,7 @@ function SiembraEditModal({
                   return (
                     <div
                       key={idx}
-                      className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
+                      className="grid grid-cols-12 gap-3 items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800 hover:border-slate-700 transition"
                     >
                       {/* Fecha y Remito */}
                       <div className="col-span-2 space-y-1">
@@ -4527,7 +4563,7 @@ function SiembraEditModal({
                       </div>
 
                       {/* Modo & Cantidad (Dosis/ha vs Cantidad Total) */}
-                      <div className={(isAdmin ? 'col-span-2' : 'col-span-3') + ' space-y-1'}>
+                      <div className={(isAdmin ? 'col-span-2' : 'col-span-3') + ' space-y-1 min-w-0'}>
                         <div className="flex items-center gap-1 mb-1">
                           <button
                             type="button"
@@ -4563,17 +4599,20 @@ function SiembraEditModal({
 
                         {calc.modoCalculo === 'dosis' ? (
                           <>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
                               <input
                                 type="number"
                                 step="any"
                                 min="0"
                                 value={ins.dosis_ha ?? ''}
-                                placeholder="Dosis"
+                                placeholder="0"
                                 onChange={(e) => updateInsumoRow(idx, 'dosis_ha', e.target.value)}
-                                className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
-                              <span className="text-[10px] text-slate-300 shrink-0 font-bold uppercase">
+                              <span
+                                className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
+                                title={`${calc.pres.unidadBase}/ha`}
+                              >
                                 {calc.pres.unidadBase}/ha
                               </span>
                             </div>
@@ -4584,17 +4623,20 @@ function SiembraEditModal({
                           </>
                         ) : (
                           <>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
                               <input
                                 type="number"
                                 step="any"
                                 min="0"
                                 value={ins.cantidad ?? ''}
-                                placeholder={calc.hasEnvase ? (calc.pres.envase || 'Bolsas') : 'Cantidad'}
+                                placeholder={calc.hasEnvase ? (calc.pres.envase || 'Bolsas') : '0'}
                                 onChange={(e) => updateInsumoRow(idx, 'cantidad', e.target.value)}
-                                className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
-                              <span className="text-[10px] text-slate-300 shrink-0 font-bold uppercase">
+                              <span
+                                className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
+                                title={calc.hasEnvase ? (calc.pres.envase || 'bolsas') : calc.pres.unidadBase}
+                              >
                                 {calc.hasEnvase ? (calc.pres.envase || 'bolsas') : calc.pres.unidadBase}
                               </span>
                             </div>
@@ -4616,8 +4658,8 @@ function SiembraEditModal({
 
                       {/* Precio Unitario & Subtotal Calculado (Solo Modo Admin) */}
                       {isAdmin && (
-                        <div className="col-span-3 text-right space-y-1">
-                          <div className="flex items-center justify-end gap-1">
+                        <div className="col-span-3 text-right space-y-1 pl-3 border-l border-slate-800/60 min-w-0">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
                               onClick={() => updateInsumoRow(idx, 'moneda', calc.moneda === 'USD' ? 'ARS' : 'USD')}
@@ -4638,7 +4680,7 @@ function SiembraEditModal({
                               value={ins.precio_unitario ?? ''}
                               placeholder={`P. Unit / ${calc.unidadPrecio}`}
                               onChange={(e) => updateInsumoRow(idx, 'precio_unitario', e.target.value)}
-                              className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-amber-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-amber-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                           <div className="text-[9.5px] text-slate-400 pr-1">
