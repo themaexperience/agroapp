@@ -3686,10 +3686,17 @@ export default function MapaPotrerosView({
         (inf.observaciones && inf.observaciones.includes('[icono:')) ||
         (inf.componentes_detalle && inf.componentes_detalle.includes('icono:'))
       );
-      const globalShowLabels = layersVisible.etiquetas_marcadores ?? true;
       const isBeingMoved = Boolean(movingInfra && movingInfra.id === inf.id);
+      const isSelected = Boolean(editingInfra && editingInfra.id === inf.id);
       const isDraggable = Boolean(isBeingMoved || dragMarkersEnabled);
-      const icon = buildInfraDivIcon(inf, inf.estilo_marcador, isDraggable, globalShowLabels, isBeingMoved);
+
+      // En vista general (currentZoom < 15), mostrar solo ícono compacto sin texto para evitar superposiciones,
+      // excepto si el marcador está seleccionado o siendo reubicado, o si el usuario desactivó etiquetas explícitamente.
+      const allowLabelByZoom = currentZoom >= 15 || isBeingMoved || isSelected;
+      const globalShowLabels = Boolean((layersVisible.etiquetas_marcadores ?? true) && allowLabelByZoom);
+      const effectiveStyle = globalShowLabels ? inf.estilo_marcador : 'icono';
+
+      const icon = buildInfraDivIcon(inf, effectiveStyle, isDraggable, globalShowLabels, isBeingMoved);
 
       const marker = L.marker([lat, lng], {
         icon,
@@ -4215,6 +4222,8 @@ export default function MapaPotrerosView({
     clickedCoords,
     drawingPoints,
     currentZoom,
+    editingInfra,
+    movingInfra,
     labelDensity,
     dragMarkersEnabled,
     handleFitFieldBounds,
@@ -7150,6 +7159,30 @@ async function handleSaveSidePanel(e) {
               🛻 Armar Cuadrilla
             </button>
 
+            {/* Toggle Rápido Etiquetas ON/OFF */}
+            <button
+              type="button"
+              onClick={() =>
+                setLayersVisible((prev) => ({
+                  ...prev,
+                  etiquetas_marcadores: !(prev.etiquetas_marcadores ?? true),
+                }))
+              }
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer ${
+                Boolean(layersVisible.etiquetas_marcadores ?? true)
+                  ? 'bg-sky-950/80 text-sky-200 border-sky-600/70 shadow-sm'
+                  : 'bg-slate-900/90 text-slate-400 border-slate-700 hover:text-white'
+              }`}
+              title={
+                Boolean(layersVisible.etiquetas_marcadores ?? true)
+                  ? 'Etiquetas de marcadores visibles (activas con zoom ≥ 15). Clic para ocultar todas.'
+                  : 'Etiquetas de marcadores ocultas. Clic para activar.'
+              }
+            >
+              <Tags className={`w-3.5 h-3.5 ${Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'text-sky-400' : 'text-slate-500'}`} />
+              <span>{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Etiquetas ON' : 'Etiquetas OFF'}</span>
+            </button>
+
             {/* Selector de Mapa Base Satélite HD */}
             <div className="inline-flex rounded-xl bg-slate-900/90 p-1 border border-slate-700">
               <button
@@ -8281,6 +8314,30 @@ async function handleSaveSidePanel(e) {
                   >
                     <Route className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">+ Traza</span>
+                  </button>
+
+                  {/* Toggle Rápido Etiquetas ON/OFF en Pantalla Completa */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLayersVisible((prev) => ({
+                        ...prev,
+                        etiquetas_marcadores: !(prev.etiquetas_marcadores ?? true),
+                      }))
+                    }
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer ${
+                      Boolean(layersVisible.etiquetas_marcadores ?? true)
+                        ? 'bg-sky-950/80 text-sky-200 border-sky-600/70 shadow-sm'
+                        : 'bg-slate-800 text-slate-400 border-slate-600 hover:text-white'
+                    }`}
+                    title={
+                      Boolean(layersVisible.etiquetas_marcadores ?? true)
+                        ? 'Etiquetas de marcadores visibles (activas con zoom ≥ 15). Clic para ocultar todas.'
+                        : 'Etiquetas de marcadores ocultas. Clic para activar.'
+                    }
+                  >
+                    <Tags className={`w-3.5 h-3.5 ${Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'text-sky-400' : 'text-slate-500'}`} />
+                    <span className="hidden sm:inline">{Boolean(layersVisible.etiquetas_marcadores ?? true) ? 'Etiquetas ON' : 'Etiquetas OFF'}</span>
                   </button>
 
                   {/* Selector de Satélite */}
