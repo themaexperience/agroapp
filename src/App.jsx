@@ -2629,8 +2629,11 @@ export default function App() {
               maquinaria={maquinaria}
               fechaOperacion={fechaOperacion}
               dolarRef={Number(dolarRef) || 1540}
-          dolarModoManual={dolarModoManual}
-          preciosHacienda={preciosHacienda}
+              dolarModoManual={dolarModoManual}
+              preciosHacienda={preciosHacienda}
+              onNavigate={navigateTab}
+              navContext={navContext}
+              onClearNavContext={handleClearNavContext}
               onRefresh={fetchAllData}
               notify={notify}
               appMode={appMode}

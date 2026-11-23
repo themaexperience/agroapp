@@ -137,6 +137,9 @@ export default function InsumosReservasView({
   potreros = [],
   fechaOperacion,
   dolarRef = 1540,
+  onNavigate,
+  navContext,
+  onClearNavContext,
   onRefresh,
   notify,
 }) {
@@ -157,6 +160,14 @@ export default function InsumosReservasView({
 
   // Solapa principal: 'stock' | 'sanidad_catalogo' | 'proveedores_esperados'
   const [vistaTab, setVistaTab] = useState('stock');
+
+  // Deep-linking desde Calendario u otros módulos
+  React.useEffect(() => {
+    if (navContext?.subTab === 'proveedores' || navContext?.subTab === 'proveedores_esperados') {
+      setVistaTab('proveedores_esperados');
+      onClearNavContext?.();
+    }
+  }, [navContext, onClearNavContext]);
 
   // Proveedores y servicios esperados
   const [proveedoresEsperados, setProveedoresEsperados] = useState([]);

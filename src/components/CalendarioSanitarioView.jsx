@@ -162,6 +162,7 @@ export default function CalendarioSanitarioView({
   const [saving, setSaving] = useState(false);
   const [modalNewOpen, setModalNewOpen] = useState(false);
   const [modalEventDetail, setModalEventDetail] = useState(null);
+  const [modalWeekProveedores, setModalWeekProveedores] = useState(null); // { weekLabel, items: [...] }
   const [editingEvento, setEditingEvento] = useState(null);
 
   // Formulario nuevo evento
@@ -751,6 +752,22 @@ export default function CalendarioSanitarioView({
             categoria: nextEstado,
             dosis: nextEstado,
             raw: { ...modalEventDetail.raw, estado: nextEstado },
+          });
+        }
+        if (modalWeekProveedores && Array.isArray(modalWeekProveedores.items)) {
+          setModalWeekProveedores({
+            ...modalWeekProveedores,
+            items: modalWeekProveedores.items.map((p) =>
+              p.id === item.id || p.originalId === item.originalId
+                ? {
+                    ...p,
+                    realizado: nextEstado === 'Recibido',
+                    categoria: nextEstado,
+                    dosis: nextEstado,
+                    raw: { ...(p.raw || {}), estado: nextEstado },
+                  }
+                : p
+            ),
           });
         }
         onRefresh?.();
@@ -2027,12 +2044,23 @@ export default function CalendarioSanitarioView({
                               <div
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setModalEventDetail(weekProvs[0]);
+                                  if (weekProvs.length > 1) {
+                                    setModalWeekProveedores({
+                                      weekLabel: `${formatFechaAR(weekStart)} al ${formatFechaAR(weekEnd)}`,
+                                      items: weekProvs,
+                                    });
+                                  } else {
+                                    setModalEventDetail(weekProvs[0]);
+                                  }
                                 }}
                                 className={`-mx-1.5 sm:-mx-2 -mt-1.5 sm:-mt-2 px-1.5 py-0.5 border-t-2 border-amber-400 bg-amber-50/80 hover:bg-amber-100 text-amber-950 font-bold mb-1 flex items-center justify-between text-[10px] sm:text-[10.5px] transition cursor-pointer truncate ${
                                   idx === 0 ? 'rounded-tl-lg' : idx === 6 ? 'rounded-tr-lg' : ''
                                 }`}
-                                title={weekProvs.map((p) => `${p.producto || p.title} (${p.labelRango})`).join(' · ')}
+                                title={
+                                  weekProvs.length > 1
+                                    ? `Semana con ${weekProvs.length} entregas/servicios: ${weekProvs.map((p) => p.producto || p.title).join(' · ')} (Clic para ver todos)`
+                                    : `${weekProvs[0].producto || weekProvs[0].title} (${weekProvs[0].labelRango})`
+                                }
                               >
                                 {idx === 0 ? (
                                   <div className="flex items-center gap-1 min-w-0 truncate">
@@ -2041,7 +2069,7 @@ export default function CalendarioSanitarioView({
                                       {weekProvs[0].producto || weekProvs[0].title}
                                     </span>
                                     {weekProvs.length > 1 && (
-                                      <span className="text-[9px] bg-amber-200 text-amber-900 font-extrabold px-1 rounded-full shrink-0">
+                                      <span className="text-[9px] bg-amber-200 text-amber-900 font-extrabold px-1 rounded-full shrink-0 animate-pulse">
                                         +{weekProvs.length - 1}
                                       </span>
                                     )}
@@ -2972,7 +3000,7 @@ export default function CalendarioSanitarioView({
                       type="button"
                       onClick={() => {
                         setModalEventDetail(null);
-                        onNavigate?.('insumos');
+                        onNavigate?.('insumos', { subTab: 'proveedores_esperados' });
                       }}
                       className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-md transition cursor-pointer"
                     >
@@ -3042,6 +3070,159 @@ export default function CalendarioSanitarioView({
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1.B: LISTA UNIFICADA DE PROVEEDORES / SERVICIOS DE LA SEMANA        */}
+      {/* ========================================================================= */}
+      {modalWeekProveedores && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setModalWeekProveedores(null)}
+        >
+          <div
+            className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>Proveedores y Servicios de la Semana</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">
+                      {modalWeekProveedores.items?.length || 0}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Semana del {modalWeekProveedores.weekLabel}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalWeekProveedores(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Listado scrolleable de proveedores */}
+            <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              {(modalWeekProveedores.items || []).map((prov) => {
+                const isRecibido = prov.realizado || prov.raw?.estado === 'Recibido';
+
+                return (
+                  <div
+                    key={prov.id}
+                    className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 hover:border-amber-500/40 transition space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                            <span className="text-base">🚚</span>
+                            <span>{prov.raw?.proveedor_o_rubro || prov.producto || prov.title}</span>
+                          </h4>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10.5px] font-black border ${
+                              isRecibido
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/70'
+                                : prov.raw?.estado === 'En Camino'
+                                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-600/70'
+                                : 'bg-amber-950/80 text-amber-300 border-amber-600/70'
+                            }`}
+                          >
+                            {isRecibido ? '✓ Recibido en Campo' : prov.raw?.estado || 'Esperando'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 font-medium mt-1">
+                          📅 {prov.labelRango || formatFechaAR(prov.date)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Indicaciones y Notas */}
+                    {(prov.raw?.indicaciones || prov.raw?.notas) && (
+                      <div className="text-xs bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1">
+                        {prov.raw?.indicaciones && (
+                          <div>
+                            <span className="text-slate-400 font-bold">Indicaciones: </span>
+                            <span className="text-slate-200">{prov.raw.indicaciones}</span>
+                          </div>
+                        )}
+                        {prov.raw?.notas && (
+                          <div>
+                            <span className="text-slate-400 font-bold">Notas: </span>
+                            <span className="text-slate-300 italic">{prov.raw.notas}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Botones de acción individual por proveedor */}
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleRealizado(prov)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm ${
+                          isRecibido
+                            ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>{isRecibido ? 'Reabrir como Pendiente' : '✓ Marcar Recibido'}</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalWeekProveedores(null);
+                            setModalEventDetail(prov);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                        >
+                          Ver Detalle
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalWeekProveedores(null);
+                            onNavigate?.('insumos', { subTab: 'proveedores_esperados' });
+                          }}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1 transition cursor-pointer shadow-sm"
+                        >
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>Ver en Insumos →</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Podés gestionar insumos y acopios desde la solapa Insumos.
+              </span>
+              <button
+                type="button"
+                onClick={() => setModalWeekProveedores(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
