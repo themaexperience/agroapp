@@ -1,0 +1,21 @@
+# Reglas y Pautas de Desarrollo — Establecimiento San José
+# Agroganadera Rincón del Sur S.A. · Las Flores, Bs. As.
+
+## 1. REGLA OBLIGATORIA DE VERSIONADO
+- Cada vez que se desarrolle o despliegue un nuevo sprint, feature importante o hotfix, es **estrictamente obligatorio** incrementar la versión en `src/config/version.js` (y `package.json`).
+- Formato: `APP_VERSION = 'Sprint 8 Activo (v2.8)'`, `APP_SPRINT = 'Sprint 8'`.
+- Esto debe realizarse ANTES de ejecutar `npm run build` y publicar la aplicación.
+
+## 2. ARQUITECTURA DE MÓDULOS (index.html)
+- La aplicación corre con carga dinámica de módulos en el navegador (`bootApp` en `index.html`) transpildada con Babel Standalone.
+- Cualquier nuevo módulo creado en `src/` DEBE agregarse en el arreglo `moduleOrder` de `index.html` en orden topológico de dependencias, junto con sus alias relativos.
+- Debe agregarse también a `requiredFiles` en `scripts/build.js`.
+
+## 3. PROCESAMIENTO DE ARCHIVOS Y MULTIMEDIA (PDFs / IMÁGENES)
+- Los PDFs de facturas, liquidaciones o balances <= 2.5 MB deben enviarse como `mimeType: 'application/pdf'` nativo a `/api/gemini` sin intentar convertirlos forzosamente a imagen si no es necesario.
+- Si el PDF supera 2.5 MB, se debe utilizar `slicePdfToImages` (`maxWidth: 1600`, `quality: 0.82`) con fallback automático al archivo PDF nativo si falla el canvas.
+- No aplicar `compressImage` a archivos PDF (solo a `image/*`).
+
+## 4. VALIDACIÓN DE BUILD
+- Antes de cada despliegue, ejecutar siempre `npm run build`. El script valida sintaxis con Babel, integridad de archivos y resolución de imports relativos.
+- No publicar si `npm run build` arroja algún error.

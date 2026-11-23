@@ -1,0 +1,5 @@
+# robots.txt - Establecimiento San José · Agroganadera Rincón del Sur S.A.
+# Aplicación privada de gestión agroganadera - Prohibido el rastreo y la indexación
+
+User-agent: *
+Disallow: /

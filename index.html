@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es" class="max-w-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Establecimiento San José — Gestión Integral Ganadera y Agrícola</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+    <link rel="alternate icon" type="image/png" href="/icon-192.png?v=2" />
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="/manifest.json?v=2" />
+    <meta name="theme-color" content="#064e3b" />
+    <meta name="background-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="San José" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+    <meta name="application-name" content="San José" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/src/index.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react-dom": "https://esm.sh/react-dom@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+          "lucide-react": "https://esm.sh/lucide-react@0.475.0?deps=react@18.3.1",
+          "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.49.1",
+          "leaflet": "https://esm.sh/leaflet@1.9.4",
+          "xlsx": "https://esm.sh/xlsx@0.18.5",
+          "jspdf": "https://esm.sh/jspdf@2.5.2",
+          "pdfjs-dist": "https://esm.sh/pdfjs-dist@3.11.174",
+          "jszip": "https://esm.sh/jszip@3.10.1"
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased max-w-full">
+    <div id="root">
+      <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 text-white font-sans p-4">
+        <div class="text-center space-y-3">
+          <div class="w-16 h-16 rounded-2xl bg-emerald-900/60 p-2 mx-auto shadow-xl border border-emerald-500/30 flex items-center justify-center backdrop-blur-xs">
+            <img
+              src="/logo-san-jose.png"
+              alt="Establecimiento San José"
+              class="w-full h-full object-contain filter brightness-0 invert"
+            />
+          </div>
+          <div class="text-sm font-extrabold text-white">Cargando Establecimiento San José...</div>
+          <div class="text-xs text-emerald-300/80 font-medium">Agroganadera Rincón del Sur S.A. · Las Flores, Bs. As.</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      const moduleOrder = [
+        {
+          id: '/src/config/version.js',
+          aliases: [
+            './config/version.js',
+            './config/version',
+            '../config/version.js',
+            '../config/version',
+            '/src/config/version.js',
+            '/src/config/version',
+          ],
+        },
+        {
+          id: '/src/lib/supabase.js',
+          aliases: [
+            '../lib/supabase',
+            '../lib/supabase.js',
+            './lib/supabase',
+            './lib/supabase.js',
+            './supabase',
+            './supabase.js',
+            '/src/lib/supabase.js',
+            '/src/lib/supabase',
+          ],
+        },
+        {
+          id: '/src/lib/dolarService.js',
+          aliases: [
+            '../lib/dolarService',
+            './lib/dolarService',
+            '../lib/dolarService.js',
+            './lib/dolarService.js',
+            '/src/lib/dolarService.js',
+            '/src/lib/dolarService',
+          ],
+        },
+        {
+          id: '/src/utils/dolarHistorico.js',
+          aliases: [
+            '../utils/dolarHistorico',
+            './utils/dolarHistorico',
+            '../utils/dolarHistorico.js',
+            './utils/dolarHistorico.js',
+            '/src/utils/dolarHistorico.js',
+            '/src/utils/dolarHistorico',
+          ],
+        },
+        {
+          id: '/src/utils/dateHelper.js',
+          aliases: [
+            './dateHelper',
+            './dateHelper.js',
+            '../utils/dateHelper',
+            './utils/dateHelper',
+            '../utils/dateHelper.js',
+            './utils/dateHelper.js',
+            '/src/utils/dateHelper.js',
+            '/src/utils/dateHelper',
+          ],
+        },
+        {
+          id: '/src/utils/auditLogger.js',
+          aliases: [
+            '../utils/auditLogger',
+            './utils/auditLogger',
+            '../utils/auditLogger.js',
+            './utils/auditLogger.js',
+            '/src/utils/auditLogger.js',
+            '/src/utils/auditLogger',
+          ],
+        },
+        {
+          id: '/src/utils/rodeoHelpers.js',
+          aliases: [
+            '../utils/rodeoHelpers',
+            './utils/rodeoHelpers',
+            '../utils/rodeoHelpers.js',
+            './utils/rodeoHelpers.js',
+            '/src/utils/rodeoHelpers.js',
+            '/src/utils/rodeoHelpers',
+          ],
+        },
+        {
+          id: '/src/utils/caravanasAuditoriaOficial.js',
+          aliases: [
+            './caravanasAuditoriaOficial',
+            './caravanasAuditoriaOficial.js',
+            '../utils/caravanasAuditoriaOficial',
+            './utils/caravanasAuditoriaOficial',
+            '../utils/caravanasAuditoriaOficial.js',
+            './utils/caravanasAuditoriaOficial.js',
+            '/src/utils/caravanasAuditoriaOficial.js',
+            '/src/utils/caravanasAuditoriaOficial',
+          ],
+        },
+        {
+          id: '/src/utils/reporteCaravanasSenasa.js',
+          aliases: [
+            './reporteCaravanasSenasa',
+            './reporteCaravanasSenasa.js',
+            '../utils/reporteCaravanasSenasa',
+            './utils/reporteCaravanasSenasa',
+            '../utils/reporteCaravanasSenasa.js',
+            './utils/reporteCaravanasSenasa.js',
+            '/src/utils/reporteCaravanasSenasa.js',
+            '/src/utils/reporteCaravanasSenasa',
+          ],
+        },
+        {
+          id: '/src/utils/rodeoMovimientos.js',
+          aliases: [
+            '../utils/rodeoMovimientos',
+            './utils/rodeoMovimientos',
+            '../utils/rodeoMovimientos.js',
+            './utils/rodeoMovimientos.js',
+            '/src/utils/rodeoMovimientos.js',
+            '/src/utils/rodeoMovimientos',
+          ],
+        },
+        {
+          id: '/src/utils/systemSnapshots.js',
+          aliases: [
+            '../utils/systemSnapshots',
+            './utils/systemSnapshots',
+            '../utils/systemSnapshots.js',
+            './utils/systemSnapshots.js',
+            '/src/utils/systemSnapshots.js',
+            '/src/utils/systemSnapshots',
+          ],
+        },
+        { id: '/src/utils/geoParser.js', aliases: ['../utils/geoParser', './utils/geoParser', '../utils/geoParser.js', './utils/geoParser.js'] },
+        {
+          id: '/src/lib/pdfSlicer.js',
+          aliases: [
+            './pdfSlicer.js',
+            './pdfSlicer',
+            '../lib/pdfSlicer.js',
+            '../lib/pdfSlicer',
+            './lib/pdfSlicer.js',
+            './lib/pdfSlicer',
+            '/src/lib/pdfSlicer.js',
+            '/src/lib/pdfSlicer',
+          ],
+        },
+        { id: '/src/utils/pdfSlicer.js', aliases: ['../utils/pdfSlicer', './utils/pdfSlicer', '../utils/pdfSlicer.js', './utils/pdfSlicer.js', '/src/utils/pdfSlicer.js', '/src/utils/pdfSlicer'] },
+        {
+          id: '/src/lib/pdfReportBuilder.js',
+          aliases: [
+            '../lib/pdfReportBuilder',
+            '../lib/pdfReportBuilder.js',
+            './lib/pdfReportBuilder',
+            './lib/pdfReportBuilder.js',
+            '/src/lib/pdfReportBuilder.js',
+            '/src/lib/pdfReportBuilder',
+          ],
+        },
+        { id: '/src/utils/pdfHelper.js', aliases: ['../utils/pdfHelper', './utils/pdfHelper', '../utils/pdfHelper.js', './utils/pdfHelper.js', './pdfHelper', './pdfHelper.js'] },
+        { id: '/src/utils/pdfExport.js', aliases: ['../utils/pdfExport', './utils/pdfExport', '../utils/pdfExport.js', './utils/pdfExport.js', './pdfExport', './pdfExport.js'] },
+        { id: '/src/utils/offlineQueue.js', aliases: ['../utils/offlineQueue', './utils/offlineQueue', '../utils/offlineQueue.js', './utils/offlineQueue.js'] },
+        {
+          id: '/src/utils/preciosRefHelper.js',
+          aliases: [
+            '../utils/preciosRefHelper',
+            '../utils/preciosRefHelper.js',
+            './utils/preciosRefHelper',
+            './utils/preciosRefHelper.js',
+            './preciosRefHelper',
+            './preciosRefHelper.js',
+            '/src/utils/preciosRefHelper.js',
+            '/src/utils/preciosRefHelper',
+          ],
+        },
+        { id: '/src/lib/geminiService.js', aliases: ['../lib/geminiService', './lib/geminiService', '../lib/geminiService.js', './lib/geminiService.js'] },
+        {
+          id: '/src/data/infraestructuraOficial.js',
+          aliases: [
+            '../data/infraestructuraOficial',
+            './data/infraestructuraOficial',
+            '../data/infraestructuraOficial.js',
+            './data/infraestructuraOficial.js',
+            '/src/data/infraestructuraOficial.js',
+            '/src/data/infraestructuraOficial',
+          ],
+        },
+        {
+          id: '/src/data/aprendizajesFundacionales.js',
+          aliases: [
+            '../data/aprendizajesFundacionales',
+            './data/aprendizajesFundacionales',
+            '../data/aprendizajesFundacionales.js',
+            './data/aprendizajesFundacionales.js',
+            '/src/data/aprendizajesFundacionales.js',
+            '/src/data/aprendizajesFundacionales',
+          ],
+        },
+        {
+          id: '/src/data/cronogramaSanJose.js',
+          aliases: [
+            '../data/cronogramaSanJose',
+            './data/cronogramaSanJose',
+            '../data/cronogramaSanJose.js',
+            './data/cronogramaSanJose.js',
+            '/src/data/cronogramaSanJose.js',
+            '/src/data/cronogramaSanJose',
+          ],
+        },
+        {
+          id: '/src/components/ConfirmDialog.jsx',
+          aliases: [
+            './components/ConfirmDialog',
+            './components/ConfirmDialog.jsx',
+            './ConfirmDialog',
+            './ConfirmDialog.jsx',
+            '../components/ConfirmDialog',
+            '../components/ConfirmDialog.jsx',
+            '/src/components/ConfirmDialog.jsx',
+            '/src/components/ConfirmDialog',
+          ],
+        },
+        {
+          id: '/src/components/MultiFileDropzone.jsx',
+          aliases: [
+            './components/MultiFileDropzone',
+            './components/MultiFileDropzone.jsx',
+            './MultiFileDropzone',
+            './MultiFileDropzone.jsx',
+            '../components/MultiFileDropzone',
+            '../components/MultiFileDropzone.jsx',
+            '/src/components/MultiFileDropzone.jsx',
+            '/src/components/MultiFileDropzone',
+          ],
+        },
+        {
+          id: '/src/components/GeminiFacturasBatchModal.jsx',
+          aliases: ['./components/GeminiFacturasBatchModal', './GeminiFacturasBatchModal.jsx', './GeminiFacturasBatchModal'],
+        },
+        {
+          id: '/src/components/GeminiLiquidacionModal.jsx',
+          aliases: ['./components/GeminiLiquidacionModal', './GeminiLiquidacionModal.jsx', './GeminiLiquidacionModal'],
+        },
+        {
+          id: '/src/components/CaravanasManagerModal.jsx',
+          aliases: [
+            './components/CaravanasManagerModal',
+            './CaravanasManagerModal.jsx',
+            './CaravanasManagerModal',
+            '../components/CaravanasManagerModal',
+            '../components/CaravanasManagerModal.jsx',
+          ],
+        },
+        {
+          id: '/src/components/ConciliadorCaravanasIaModal.jsx',
+          aliases: [
+            './components/ConciliadorCaravanasIaModal',
+            './ConciliadorCaravanasIaModal.jsx',
+            './ConciliadorCaravanasIaModal',
+            '../components/ConciliadorCaravanasIaModal',
+            '../components/ConciliadorCaravanasIaModal.jsx',
+          ],
+        },
+        {
+          id: '/src/components/GeminiBalanceContableModal.jsx',
+          aliases: [
+            './components/GeminiBalanceContableModal',
+            './GeminiBalanceContableModal.jsx',
+            './GeminiBalanceContableModal',
+            '../components/GeminiBalanceContableModal',
+            '../components/GeminiBalanceContableModal.jsx',
+          ],
+        },
+        {
+          id: '/src/components/HistorialAuditoriaView.jsx',
+          aliases: [
+            './components/HistorialAuditoriaView',
+            './HistorialAuditoriaView.jsx',
+            './HistorialAuditoriaView',
+            '../components/HistorialAuditoriaView',
+            '../components/HistorialAuditoriaView.jsx',
+          ],
+        },
+        {
+          id: '/src/components/GeminiRecetaModal.jsx',
+          aliases: ['./components/GeminiRecetaModal', './GeminiRecetaModal.jsx', './GeminiRecetaModal'],
+        },
+        {
+          id: '/src/components/GeminiRepuestoModal.jsx',
+          aliases: ['./components/GeminiRepuestoModal', './GeminiRepuestoModal.jsx', './GeminiRepuestoModal'],
+        },
+        {
+          id: '/src/components/GeminiPlanillaGasoilModal.jsx',
+          aliases: ['./components/GeminiPlanillaGasoilModal', './GeminiPlanillaGasoilModal.jsx', './GeminiPlanillaGasoilModal'],
+        },
+        {
+          id: '/src/components/CondicionCorporalStars.jsx',
+          aliases: ['./components/CondicionCorporalStars', './CondicionCorporalStars.jsx', './CondicionCorporalStars'],
+        },
+        {
+          id: '/src/components/PotreroCard.jsx',
+          aliases: [
+            './components/PotreroCard',
+            './components/PotreroCard.jsx',
+            './PotreroCard',
+            './PotreroCard.jsx',
+            '../components/PotreroCard',
+            '../components/PotreroCard.jsx',
+            '/src/components/PotreroCard.jsx',
+            '/src/components/PotreroCard',
+          ],
+        },
+        {
+          id: '/src/components/RodeosCaravanasView.jsx',
+          aliases: ['./components/RodeosCaravanasView', './RodeosCaravanasView.jsx', './RodeosCaravanasView'],
+        },
+        {
+          id: '/src/components/TableroInicioView.jsx',
+          aliases: ['./components/TableroInicioView', './TableroInicioView.jsx'],
+        },
+        {
+          id: '/src/components/MapaPotrerosView.jsx',
+          aliases: [
+            './components/MapaPotrerosView',
+            './MapaPotrerosView.jsx',
+            './MapaPotrerosView',
+            '../components/MapaPotrerosView',
+            '../components/MapaPotrerosView.jsx',
+            '/src/components/MapaPotrerosView.jsx',
+            '/src/components/MapaPotrerosView',
+          ],
+        },
+        {
+          id: '/src/components/TareasCampoView.jsx',
+          aliases: ['./components/TareasCampoView', './TareasCampoView.jsx'],
+        },
+        {
+          id: '/src/components/CalendarioSanitarioView.jsx',
+          aliases: ['./components/CalendarioSanitarioView', './CalendarioSanitarioView.jsx'],
+        },
+        {
+          id: '/src/components/SiembrasCostosView.jsx',
+          aliases: ['./components/SiembrasCostosView', './SiembrasCostosView.jsx'],
+        },
+        {
+          id: '/src/components/SiembrasView.jsx',
+          aliases: [
+            './components/SiembrasView',
+            './SiembrasView.jsx',
+            './SiembrasView',
+            '../components/SiembrasView',
+            '../components/SiembrasView.jsx',
+            '/src/components/SiembrasView.jsx',
+            '/src/components/SiembrasView',
+          ],
+        },
+        {
+          id: '/src/components/FacturaDetalleModal.jsx',
+          aliases: [
+            './FacturaDetalleModal.jsx',
+            './FacturaDetalleModal',
+            '../components/FacturaDetalleModal',
+            '../components/FacturaDetalleModal.jsx',
+          ],
+        },
+        {
+          id: '/src/components/CostosFinanzasView.jsx',
+          aliases: [
+            './components/CostosFinanzasView',
+            './CostosFinanzasView.jsx',
+            './CostosFinanzasView',
+          ],
+        },
+        {
+          id: '/src/components/LiquidacionDetalleModal.jsx',
+          aliases: [
+            './components/LiquidacionDetalleModal',
+            './LiquidacionDetalleModal.jsx',
+            './LiquidacionDetalleModal',
+            '../components/LiquidacionDetalleModal',
+            '../components/LiquidacionDetalleModal.jsx',
+          ],
+        },
+        {
+          id: '/src/components/VentasView.jsx',
+          aliases: [
+            './components/VentasView',
+            './VentasView.jsx',
+            './VentasView',
+            '../components/VentasView',
+            '../components/VentasView.jsx',
+          ],
+        },
+        {
+          id: '/src/components/MaquinariaTallerView.jsx',
+          aliases: ['./components/MaquinariaTallerView', './MaquinariaTallerView.jsx'],
+        },
+        {
+          id: '/src/components/BitacoraMovimientosView.jsx',
+          aliases: ['./components/BitacoraMovimientosView', './BitacoraMovimientosView.jsx'],
+        },
+        {
+          id: '/src/components/InsumosReservasView.jsx',
+          aliases: ['./components/InsumosReservasView', './InsumosReservasView.jsx', './InsumosReservasView'],
+        },
+        {
+          id: '/src/components/CopilotoSanJoseDrawer.jsx',
+          aliases: ['./components/CopilotoSanJoseDrawer', './CopilotoSanJoseDrawer.jsx', './CopilotoSanJoseDrawer'],
+        },
+        {
+          id: '/src/components/CopilotoCampoModal.jsx',
+          aliases: ['./components/CopilotoCampoModal', './CopilotoCampoModal.jsx', './CopilotoCampoModal'],
+        },
+        {
+          id: '/src/components/CuadrillaPlannerModal.jsx',
+          aliases: [
+            './components/CuadrillaPlannerModal',
+            './CuadrillaPlannerModal.jsx',
+            './CuadrillaPlannerModal',
+            '../components/CuadrillaPlannerModal',
+            '../components/CuadrillaPlannerModal.jsx',
+            '/src/components/CuadrillaPlannerModal.jsx',
+            '/src/components/CuadrillaPlannerModal',
+          ],
+        },
+        {
+          id: '/src/components/InformesEjecutivosView.jsx',
+          aliases: ['./components/InformesEjecutivosView', './InformesEjecutivosView.jsx', './InformesEjecutivosView'],
+        },
+        {
+          id: '/src/components/InformesView.jsx',
+          aliases: ['./components/InformesView', './InformesView.jsx', './InformesView'],
+        },
+        {
+          id: '/src/components/SystemSnapshotsModal.jsx',
+          aliases: [
+            './components/SystemSnapshotsModal',
+            './components/SystemSnapshotsModal.jsx',
+            './SystemSnapshotsModal',
+            './SystemSnapshotsModal.jsx',
+            '../components/SystemSnapshotsModal',
+            '../components/SystemSnapshotsModal.jsx',
+            '/src/components/SystemSnapshotsModal.jsx',
+            '/src/components/SystemSnapshotsModal',
+          ],
+        },
+        {
+          id: '/src/components/LoginView.jsx',
+          aliases: ['./components/LoginView', './LoginView.jsx', './LoginView'],
+        },
+        { id: '/src/App.jsx', aliases: ['./App'] },
+        { id: '/src/main.jsx', aliases: [] },
+      ];
+
+      async function bootApp() {
+        const blobMap = {};
+        for (const mod of moduleOrder) {
+          const res = await fetch(`${mod.id}?v=${Date.now()}`);
+          let source = await res.text();
+          source = source.replace(/import\s+['"]\.\/index\.css['"];?/g, '');
+          source = source.replace(/import\.meta\.env/g, '(window.__ENV__ || {})');
+
+          // 1. Reemplazar imports / re-exports estáticos
+          for (const [alias, blobUrl] of Object.entries(blobMap)) {
+            const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Reemplaza: from './alias' o from '../alias'
+            const reFrom = new RegExp(`from\\s+['"]${escaped}['"]`, 'g');
+            source = source.replace(reFrom, `from '${blobUrl}'`);
+            // Reemplaza: import './alias'
+            const reImport = new RegExp(`import\\s+['"]${escaped}['"]`, 'g');
+            source = source.replace(reImport, `import '${blobUrl}'`);
+          }
+
+          // 2. Seguridad: advertir si quedó algún import relativo no resuelto hacia un blob:
+          const unhandledRelative = source.match(/(?:from|import)\s+['"](\.[^'"]+)['"]/);
+          if (unhandledRelative) {
+            console.error(
+              `[Bootloader] Specifier relativo no resuelto en ${mod.id}: "${unhandledRelative[1]}". Esto provocaría error "base scheme isn't hierarchical".`
+            );
+          }
+
+          const compiled = window.Babel.transform(source, {
+            presets: ['react'],
+            filename: mod.id,
+          }).code;
+
+          const url = URL.createObjectURL(
+            new Blob([compiled], { type: 'application/javascript' })
+          );
+          for (const alias of mod.aliases) {
+            blobMap[alias] = url;
+          }
+          if (mod.id === '/src/main.jsx') {
+            await import(url);
+          }
+        }
+      }
+
+      bootApp().catch((err) => {
+        console.error('Error iniciando aplicación:', err);
+        document.getElementById('root').innerHTML = `
+          <div style="padding:24px;color:#991b1b;background:#fef2f2;font-family:sans-serif">
+            <strong>Error cargando la aplicación:</strong> ${err.message}
+          </div>
+        `;
+      });
+    </script>
+  </body>
+</html>

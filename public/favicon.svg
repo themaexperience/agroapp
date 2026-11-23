@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Forest Green Gradient -->
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="50%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#065f46" />
+    </linearGradient>
+
+    <!-- Gold Foil Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDF4DC" />
+      <stop offset="35%" stop-color="#D4A359" />
+      <stop offset="70%" stop-color="#B88235" />
+      <stop offset="100%" stop-color="#E2B76E" />
+    </linearGradient>
+
+    <!-- Soft Drop Shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#064e3b" flood-opacity="0.2" />
+    </filter>
+  </defs>
+
+  <!-- Clean Solid White Background -->
+  <rect width="512" height="512" fill="#ffffff" />
+
+  <!-- Outer Rings in Forest Green & Gold -->
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#greenGrad)" stroke-width="5" opacity="0.95" />
+  <circle cx="256" cy="256" r="185" fill="none" stroke="url(#goldGrad)" stroke-width="2" stroke-dasharray="6,6" opacity="0.85" />
+
+  <!-- Cardinal Dots -->
+  <circle cx="256" cy="61" r="4.5" fill="url(#greenGrad)" />
+  <circle cx="256" cy="451" r="4.5" fill="url(#greenGrad)" />
+  <circle cx="61" cy="256" r="4.5" fill="url(#greenGrad)" />
+  <circle cx="451" cy="256" r="4.5" fill="url(#greenGrad)" />
+
+  <!-- Monogram SJ -->
+  <g filter="url(#shadow)">
+    <!-- Letter S -->
+    <path d="M 230 185 
+             C 210 165, 175 168, 155 190 
+             C 138 208, 140 236, 162 254 
+             C 178 267, 215 282, 222 298 
+             C 228 312, 222 328, 206 338 
+             C 188 348, 160 344, 142 328
+             L 132 344
+             C 155 365, 192 368, 218 352
+             C 242 336, 246 308, 234 286
+             C 222 266, 185 250, 175 238
+             C 162 222, 165 204, 178 194
+             C 192 184, 215 186, 228 198
+             Z" 
+          fill="url(#greenGrad)" />
+
+    <!-- Letter J -->
+    <path d="M 275 170 
+             L 345 170 
+             L 345 192 
+             L 322 192 
+             L 322 312 
+             C 322 346, 298 368, 260 368 
+             C 238 368, 218 358, 208 346 
+             L 220 330 
+             C 228 340, 242 346, 258 346 
+             C 282 346, 298 332, 298 308 
+             L 298 192 
+             L 275 192 
+             Z" 
+          fill="url(#goldGrad)" />
+  </g>
+
+  <!-- Wordmark "SAN JOSÉ" beneath the monogram -->
+  <text x="256" y="394" 
+        text-anchor="middle" 
+        font-family="'Georgia', 'Times New Roman', serif" 
+        font-size="22" 
+        font-weight="bold" 
+        letter-spacing="5" 
+        fill="#064e3b">
+    SAN JOSÉ
+  </text>
+  <text x="256" y="416" 
+        text-anchor="middle" 
+        font-family="'Arial', 'Segoe UI', sans-serif" 
+        font-size="10" 
+        font-weight="bold" 
+        letter-spacing="3" 
+        fill="#047857"
+        opacity="0.9">
+    ESTABLECIMIENTO
+  </text>
+</svg>

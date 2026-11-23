@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Blindaje contra desbordes horizontales en móvil y tablet */
+html,
+body,
+#root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Custom Leaflet tooltips for Potreros (Alto Contraste + Halo Oscuro) */
+.potrero-label-tooltip {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.42) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  border-radius: 8px !important;
+  padding: 2px 6px !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.85) !important;
+  white-space: nowrap !important;
+  width: auto !important;
+  min-width: unset !important;
+}
+
+.potrero-label-tooltip::before {
+  display: none !important;
+}
+
+/* Etiquetas ultra-limpias sin caja negra para potreros */
+.leaflet-tooltip.potrero-clean-label,
+.potrero-clean-label,
+.potrero-clean-label-marker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+  width: auto !important;
+  min-width: unset !important;
+  max-width: none !important;
+  pointer-events: none !important;
+}
+
+.leaflet-tooltip.potrero-clean-label::before,
+.potrero-clean-label::before,
+.potrero-clean-label-marker::before {
+  display: none !important;
+}
+
+/* Badge visible y nítido para etiquetas de potreros (P1, P5, etc.) */
+.potrero-label-box {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  border-radius: 8px !important;
+  padding: 2px 6px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+  white-space: nowrap !important;
+  width: auto !important;
+  min-width: unset !important;
+  max-width: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  pointer-events: none !important;
+}
+
+.potrero-label-box.resource-pill {
+  border-radius: 9999px !important;
+  padding: 2.5px 8px !important;
+}
+
+/* Marcadores de Infraestructura: Chip / Tarjeta / Icono */
+.infra-chip-marker-wrapper {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+/* Tooltip compacto en hover para pines de infraestructura */
+.infra-hover-tooltip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  white-space: nowrap !important;
+  width: auto !important;
+}
+
+.infra-hover-tooltip::before {
+  display: none !important;
+}
+
+/* Pines arrastrables e interactivos para trazas de caminos y boyeros */
+.trace-vertex-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.1s ease;
+}
+
+.trace-vertex-pin:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.trace-midpoint-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #0f172a;
+  color: #38bdf8;
+  font-size: 13px;
+  font-weight: 900;
+  border: 1.5px solid #38bdf8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.9;
+  transition: all 0.15s ease;
+}
+
+.trace-midpoint-pin:hover {
+  transform: scale(1.2);
+  background: #38bdf8;
+  color: #0f172a;
+  opacity: 1;
+}
+
+/* Contención estricta de Leaflet para evitar desbordes sobre encabezado */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 10;
+  overflow: hidden !important;
+  background-color: #0f172a;
+}
+
+.leaflet-pane {
+  max-width: 100% !important;
+}
+
+.leaflet-tooltip-pane {
+  overflow: hidden !important;
+}
+
+/* Reset completo para badges flotantes de rodeos en Leaflet */
+.rodeo-floating-badge,
+.leaflet-div-icon.rodeo-floating-badge {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  outline: none !important;
+}
+
+/* Badges de rodeos en móvil/tablet (< 768px): compactar para evitar superposición */
+@media (max-width: 768px) {
+  .rodeo-floating-badge .rodeo-badge-box {
+    width: auto !important;
+    max-width: 250px !important;
+    padding: 2.5px 8px !important;
+    border-radius: 9999px !important;
+    white-space: nowrap !important;
+  }
+  .rodeo-floating-badge .rodeo-sub-label {
+    display: none !important;
+  }
+}
+
+/* Utilidad no-scrollbar: elimina barras de desplazamiento donde se aplique */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Barras de desplazamiento finas y modernas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.25) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+/* Configuración de Impresión Horizontal para Planilla de Campo */
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+  table {
+    table-layout: fixed;
+    width: 100% !important;
+  }
+}
