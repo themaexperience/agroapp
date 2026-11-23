@@ -5424,19 +5424,6 @@ export default function RodeosCaravanasView({
                   <span>✨ Importar con IA</span>
                 </button>
 
-                {/* Toggle Modo Lectura Seguro vs Modo Edición Rápida */}
-                <button
-                  type="button"
-                  onClick={() => setGlobalEditMode((prev) => !prev)}
-                  className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer shrink-0 border ${
-                    globalEditMode
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-sm'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
-                  }`}
-                  title={globalEditMode ? 'Volver a Modo Lectura Seguro (bloquea toques accidentales)' : 'Habilitar edición rápida con steppers en todos los rodeos'}
-                >
-                  <span>{globalEditMode ? '✓ Modo Lectura' : '✏️ Modo Edición'}</span>
-                </button>
 
                 {/* Control 3 — Menú Desplegable Compacto: Acciones ▾ */}
                 <div className="relative inline-block text-left">
@@ -10089,30 +10076,30 @@ export default function RodeosCaravanasView({
 
             {/* Panel Lateral Drawer */}
             <div className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 text-slate-900 z-10 animate-in slide-in-from-right duration-200">
-              {/* Encabezado Daylight UI */}
-              <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/80 flex items-start justify-between shrink-0">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
-                      <Users className="w-5 h-5" />
-                    </span>
-                    <h2 className="text-lg font-black text-slate-900">
+              {/* Encabezado Daylight UI Blanco Limpio */}
+              <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <Users className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-black text-slate-900 tracking-tight">
                       Editar Rodeo: <span className="text-emerald-800">{r.nombre || 'Sin nombre'}</span>
                     </h2>
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                      <span className="font-bold text-slate-700">
+                        {potreroObj?.nombre || (r.potrero_numero ? formatPotreroNum(r.potrero_numero) : 'Sin potrero asignado')}
+                      </span>
+                      {haRaw > 0 && <span className="text-slate-400 font-semibold">· {haRaw} ha</span>}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-                    <span className="font-bold text-slate-700">
-                      {potreroObj?.nombre || (r.potrero_numero ? formatPotreroNum(r.potrero_numero) : 'Sin potrero asignado')}
-                    </span>
-                    {haRaw > 0 && <span className="text-slate-400 font-semibold">· {haRaw} ha</span>}
-                  </p>
                 </div>
                 <button
                   type="button"
                   disabled={savingRodeoDrawer}
                   onClick={() => setEditingRodeoDrawer(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer disabled:opacity-50"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
                   title="Cerrar sin guardar"
                 >
                   <X className="w-5 h-5" />
@@ -10120,8 +10107,8 @@ export default function RodeosCaravanasView({
               </div>
 
               {/* Cuerpo con Scroll */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-                {/* Fila 1: Potrero y Rol Protocolar */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                {/* Fila 1: Potrero / Ubicación y Categoría / Tipo de Rodeo */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
                   <div>
                     <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
@@ -10147,7 +10134,7 @@ export default function RodeosCaravanasView({
 
                   <div>
                     <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
-                      Rol Protocolar
+                      Categoría / Tipo de Rodeo
                     </label>
                     <select
                       value={r.rol_protocolo || inferirRolProtocolo(r)}
@@ -10163,14 +10150,14 @@ export default function RodeosCaravanasView({
                   </div>
                 </div>
 
-                {/* Fila 2: Categorías de Ganado (Grilla 2 Columnas) */}
+                {/* Fila 2: Categorías de Ganado (Grilla Ordenada) */}
                 <div className="space-y-4">
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
                     Conteo de Cabezas por Categoría
                   </h3>
 
                   {/* Vacas */}
-                  <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+                  <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
                     <div>
                       <span className="block text-xs font-black text-slate-900">Vacas (Vientres)</span>
                       <span className="text-[10px] text-slate-500 font-medium">Madres del rodeo</span>
@@ -10205,7 +10192,7 @@ export default function RodeosCaravanasView({
                       <div>
                         <span className="text-xs font-black text-emerald-950">Terneros al Pie</span>
                         <div className="text-[10px] text-emerald-800 font-semibold mt-0.5">
-                          Total: <strong className="text-emerald-950 text-xs">{cantTerneros} cab.</strong>
+                          Total calculado: <strong className="text-emerald-950 text-xs font-black">{cantTerneros} cab.</strong>
                           {pctAlPie != null && (
                             <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-emerald-100 border border-emerald-300 font-extrabold text-[9px]">
                               {pctAlPie}% al pie
@@ -10217,13 +10204,16 @@ export default function RodeosCaravanasView({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {/* Terneros Machos */}
-                      <div className="bg-white p-2.5 rounded-lg border border-sky-200 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-sky-900">Machos (M)</span>
-                        <div className="flex items-center gap-1 w-28">
+                      <div className="bg-white p-2.5 rounded-lg border border-sky-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div>
+                          <span className="block text-xs font-bold text-sky-900">Terneros Machos (M)</span>
+                          <span className="text-[10px] text-sky-700 font-semibold">Mamones machos</span>
+                        </div>
+                        <div className="flex items-center gap-1 w-32">
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('terneros_machos', -1)}
-                            className="w-7 h-7 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             -
                           </button>
@@ -10231,12 +10221,12 @@ export default function RodeosCaravanasView({
                             value={r.terneros_machos ?? 0}
                             allowDecimals={false}
                             onChange={(val) => updateDrawerField('terneros_machos', val)}
-                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-sky-600"
+                            className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-sky-600"
                           />
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('terneros_machos', 1)}
-                            className="w-7 h-7 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-sky-50 hover:bg-sky-100 border border-sky-300 font-bold text-sky-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             +
                           </button>
@@ -10244,13 +10234,16 @@ export default function RodeosCaravanasView({
                       </div>
 
                       {/* Terneros Hembras */}
-                      <div className="bg-white p-2.5 rounded-lg border border-rose-200 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-rose-900">Hembras (H)</span>
-                        <div className="flex items-center gap-1 w-28">
+                      <div className="bg-white p-2.5 rounded-lg border border-rose-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div>
+                          <span className="block text-xs font-bold text-rose-900">Terneros Hembras (H)</span>
+                          <span className="text-[10px] text-rose-700 font-semibold">Mamones hembras</span>
+                        </div>
+                        <div className="flex items-center gap-1 w-32">
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('terneros_hembras', -1)}
-                            className="w-7 h-7 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             -
                           </button>
@@ -10258,12 +10251,12 @@ export default function RodeosCaravanasView({
                             value={r.terneros_hembras ?? 0}
                             allowDecimals={false}
                             onChange={(val) => updateDrawerField('terneros_hembras', val)}
-                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-rose-600"
+                            className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-rose-600"
                           />
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('terneros_hembras', 1)}
-                            className="w-7 h-7 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold text-rose-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             +
                           </button>
@@ -10278,20 +10271,23 @@ export default function RodeosCaravanasView({
                       <div>
                         <span className="text-xs font-black text-slate-900">Toros y Reproductores</span>
                         <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
-                          Total: <strong className="text-slate-900 text-xs">{totalToros} cab.</strong>
+                          Total calculado: <strong className="text-slate-900 text-xs font-black">{totalToros} cab.</strong>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {/* Toros Padres */}
-                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-slate-800">Toros Padres</span>
-                        <div className="flex items-center gap-1 w-28">
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div>
+                          <span className="block text-xs font-bold text-slate-800">Toros Padres</span>
+                          <span className="text-[10px] text-slate-500 font-medium">Reproductores</span>
+                        </div>
+                        <div className="flex items-center gap-1 w-32">
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('toros_padres', -1)}
-                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             -
                           </button>
@@ -10299,12 +10295,12 @@ export default function RodeosCaravanasView({
                             value={r.toros_padres ?? 0}
                             allowDecimals={false}
                             onChange={(val) => updateDrawerField('toros_padres', val)}
-                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
+                            className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
                           />
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('toros_padres', 1)}
-                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             +
                           </button>
@@ -10312,13 +10308,16 @@ export default function RodeosCaravanasView({
                       </div>
 
                       {/* Toritos */}
-                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-slate-800">Toritos</span>
-                        <div className="flex items-center gap-1 w-28">
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div>
+                          <span className="block text-xs font-bold text-slate-800">Toritos</span>
+                          <span className="text-[10px] text-slate-500 font-medium">Jóvenes / Repaso</span>
+                        </div>
+                        <div className="flex items-center gap-1 w-32">
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('toritos', -1)}
-                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             -
                           </button>
@@ -10326,12 +10325,12 @@ export default function RodeosCaravanasView({
                             value={r.toritos ?? 0}
                             allowDecimals={false}
                             onChange={(val) => updateDrawerField('toritos', val)}
-                            className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
+                            className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-slate-500"
                           />
                           <button
                             type="button"
                             onClick={() => handleStepDrawer('toritos', 1)}
-                            className="w-7 h-7 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm"
+                            className="w-8 h-8 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                           >
                             +
                           </button>
@@ -10354,19 +10353,19 @@ export default function RodeosCaravanasView({
                     </div>
                   </div>
 
-                  {/* Vaquillonas y CUT */}
+                  {/* Vaquillonas Reposición y Vacas CUT / Descarte */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Vaquillonas Reposición */}
-                    <div className="bg-purple-50/40 p-3 rounded-xl border border-purple-100 flex items-center justify-between gap-2">
+                    <div className="bg-purple-50/40 p-3 rounded-xl border border-purple-100 flex items-center justify-between gap-2 shadow-2xs">
                       <div>
                         <span className="block text-xs font-bold text-purple-950">Vaq. Rep.</span>
                         <span className="text-[10px] text-purple-700 font-medium">Recría interna</span>
                       </div>
-                      <div className="flex items-center gap-1 w-28">
+                      <div className="flex items-center gap-1 w-32">
                         <button
                           type="button"
                           onClick={() => handleStepDrawer('vaquillonas_reposicion', -1)}
-                          className="w-7 h-7 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm"
+                          className="w-8 h-8 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                         >
                           -
                         </button>
@@ -10374,12 +10373,12 @@ export default function RodeosCaravanasView({
                           value={r.vaquillonas_reposicion ?? 0}
                           allowDecimals={false}
                           onChange={(val) => updateDrawerField('vaquillonas_reposicion', val)}
-                          className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-purple-600"
+                          className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-purple-600"
                         />
                         <button
                           type="button"
                           onClick={() => handleStepDrawer('vaquillonas_reposicion', 1)}
-                          className="w-7 h-7 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm"
+                          className="w-8 h-8 rounded bg-purple-50 hover:bg-purple-100 border border-purple-300 font-bold text-purple-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                         >
                           +
                         </button>
@@ -10387,16 +10386,16 @@ export default function RodeosCaravanasView({
                     </div>
 
                     {/* Vacas CUT / Descarte */}
-                    <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100 flex items-center justify-between gap-2">
+                    <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100 flex items-center justify-between gap-2 shadow-2xs">
                       <div>
-                        <span className="block text-xs font-bold text-amber-950">Vacas CUT</span>
+                        <span className="block text-xs font-bold text-amber-950">CUT / Descarte</span>
                         <span className="text-[10px] text-amber-700 font-medium">Cría último tercio</span>
                       </div>
-                      <div className="flex items-center gap-1 w-28">
+                      <div className="flex items-center gap-1 w-32">
                         <button
                           type="button"
                           onClick={() => handleStepDrawer('vacas_cut', -1)}
-                          className="w-7 h-7 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm"
+                          className="w-8 h-8 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                         >
                           -
                         </button>
@@ -10404,12 +10403,12 @@ export default function RodeosCaravanasView({
                           value={r.vacas_cut ?? 0}
                           allowDecimals={false}
                           onChange={(val) => updateDrawerField('vacas_cut', val)}
-                          className="w-full h-7 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-amber-600"
+                          className="w-full h-8 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded focus:border-amber-600"
                         />
                         <button
                           type="button"
                           onClick={() => handleStepDrawer('vacas_cut', 1)}
-                          className="w-7 h-7 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm"
+                          className="w-8 h-8 rounded bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-amber-800 flex items-center justify-center cursor-pointer text-sm active:scale-95 transition"
                         >
                           +
                         </button>
