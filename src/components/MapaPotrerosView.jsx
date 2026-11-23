@@ -5624,19 +5624,20 @@ async function handleSaveSidePanel(e) {
             )}
 
             {/* PANEL FLOTANTE DE CAPAS Y MODOS DE VISTA SOBRE EL MAPA (con scroll para no cortarse abajo) */}
-            <div className={`absolute ${isExpanded ? 'top-16 right-4' : 'top-3 right-3'} z-[400] max-w-xs`}>
+            <div className={`absolute ${isExpanded ? 'top-16 right-4 bottom-4' : 'top-3 right-3 bottom-3'} z-[400] max-w-xs flex flex-col pointer-events-none`}>
               {!floatingPanelOpen ? (
                 <button
                   type="button"
                   onClick={() => setFloatingPanelOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-extrabold border border-slate-700 shadow-lg flex items-center gap-2"
+                  className="pointer-events-auto px-3.5 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-extrabold border border-slate-700 shadow-lg flex items-center gap-2 self-end"
                 >
                   <Layers className="w-4 h-4 text-emerald-400" />
                   Capas y Vista
                 </button>
               ) : (
-                <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl border border-slate-700 shadow-2xl p-3.5 w-64 space-y-3 text-xs max-h-[calc(100%-24px)] overflow-y-auto pr-1">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white rounded-2xl border border-slate-700 shadow-2xl p-3.5 w-64 max-h-[calc(100%-12px)] flex flex-col overflow-hidden text-xs">
+                  {/* Cabecera fija del panel */}
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
                     <span className="font-extrabold text-emerald-300 flex items-center gap-1.5">
                       <Layers className="w-4 h-4" />
                       Capas y Modos de Mapa
@@ -5644,371 +5645,374 @@ async function handleSaveSidePanel(e) {
                     <button
                       type="button"
                       onClick={() => setFloatingPanelOpen(false)}
-                      className="text-slate-400 hover:text-white p-0.5"
+                      className="text-slate-400 hover:text-white p-0.5 cursor-pointer transition"
                       title="Minimizar panel de capas"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Bloque 1: Pintura de Fondo de Potreros (selección única) */}
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      1. Pintura de Fondo (Potreros)
-                    </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {[
-                        { id: 'contornos', label: '🔲 Solo Contornos' },
-                        { id: 'semaforo', label: '🚦 Semáforo Carga' },
-                        { id: 'pasturas', label: '🌱 Pasturas' },
-                        { id: 'ambientes', label: '🏞️ Ambientes' },
-                      ].map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setMapViewMode(m.id)}
-                          className={`px-2 py-1.5 rounded-lg text-[11px] font-bold text-left transition border ${
-                            mapViewMode === m.id
-                              ? 'bg-emerald-600 text-white border-emerald-400'
-                              : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-800'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Bloque 2: Capas Superpuestas Independientes con Filtro Jerárquico */}
-                  <div className="space-y-2 pt-1.5 border-t border-slate-800">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      2. Capas Superpuestas
-                    </div>
-
-                    {/* Números de Potrero */}
-                    <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
-                      <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                        🏷️ Números de Potrero (P#)
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(layersVisible.potreros_numeros)}
-                        onChange={() =>
-                          setLayersVisible((prev) => ({
-                            ...prev,
-                            potreros_numeros: !prev.potreros_numeros,
-                          }))
-                        }
-                        className="rounded border-slate-600 text-emerald-500 focus:ring-0"
-                      />
-                    </label>
-
-                    {/* Etiqueta de Rodeos y Cabezas */}
-                    <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
-                      <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                        🐄 Rodeos y Cabezas
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(layersVisible.rodeos_labels)}
-                        onChange={() =>
-                          setLayersVisible((prev) => ({
-                            ...prev,
-                            rodeos_labels: !prev.rodeos_labels,
-                          }))
-                        }
-                        className="rounded border-slate-600 text-emerald-500 focus:ring-0"
-                      />
-                    </label>
-
-                    {/* Selector de Densidad de Carteles (Anti-superposición) */}
-                    <div className="pt-1.5 pb-1 px-1 bg-slate-900/60 rounded-xl border border-slate-800/80">
-                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-0.5">
-                        <span>📏 Densidad Carteles</span>
-                        <span className="text-[9px] text-emerald-400 font-bold">
-                          {labelDensity === 'auto' ? `Auto (Z${currentZoom})` : labelDensity === 'compacto' ? 'Compacto' : 'Detallado'}
-                        </span>
+                  {/* Contenedor scrolleable interno con todas las capas */}
+                  <div className="overflow-y-auto flex-1 pr-1 pb-4 pt-3 space-y-3 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+                    {/* Bloque 1: Pintura de Fondo de Potreros (selección única) */}
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        1. Pintura de Fondo (Potreros)
                       </div>
-                      <div className="grid grid-cols-3 gap-1">
+                      <div className="grid grid-cols-2 gap-1">
                         {[
-                          { id: 'auto', label: '⚡ Auto' },
-                          { id: 'compacto', label: '🏷️ P# & Cab.' },
-                          { id: 'detallado', label: '📋 Detallado' },
-                        ].map((d) => (
+                          { id: 'contornos', label: '🔲 Solo Contornos' },
+                          { id: 'semaforo', label: '🚦 Semáforo Carga' },
+                          { id: 'pasturas', label: '🌱 Pasturas' },
+                          { id: 'ambientes', label: '🏞️ Ambientes' },
+                        ].map((m) => (
                           <button
-                            key={d.id}
+                            key={m.id}
                             type="button"
-                            onClick={() => setLabelDensity(d.id)}
-                            className={`px-1.5 py-1 rounded-lg text-[10px] font-bold text-center transition border ${
-                              labelDensity === d.id
-                                ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                            onClick={() => setMapViewMode(m.id)}
+                            className={`px-2 py-1.5 rounded-lg text-[11px] font-bold text-left transition border ${
+                              mapViewMode === m.id
+                                ? 'bg-emerald-600 text-white border-emerald-400'
                                 : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-800'
                             }`}
                           >
-                            {d.label}
+                            {m.label}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Toggle Rápido: Mostrar texto en marcadores de infraestructura */}
-                    <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg" title="Alternar entre Chips legibles con texto o compactar a Solo Ícono">
-                      <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                        <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                        🏷️ Etiquetas en Marcadores
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(layersVisible.etiquetas_marcadores ?? true)}
-                        onChange={() =>
-                          setLayersVisible((prev) => ({
-                            ...prev,
-                            etiquetas_marcadores: !(prev.etiquetas_marcadores ?? true),
-                          }))
-                        }
-                        className="rounded border-slate-600 text-emerald-500 focus:ring-0"
-                      />
-                    </label>
+                    {/* Bloque 2: Capas Superpuestas Independientes con Filtro Jerárquico */}
+                    <div className="space-y-2 pt-1.5 border-t border-slate-800">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        2. Capas Superpuestas
+                      </div>
 
-                    {/* FILTRO JERÁRQUICO DESPLEGABLE DE INFRAESTRUCTURA CON TOGGLE MAESTRO */}
-                    <div className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 space-y-2">
-                      <div className="w-full flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-emerald-300">
-                        <button
-                          type="button"
-                          onClick={() => setInfraGroupOpen(!infraGroupOpen)}
-                          className="flex items-center gap-1.5 hover:text-emerald-200"
-                        >
-                          <Wrench className="w-3.5 h-3.5" />
-                          <span>Infraestructura ({infraestructura.length})</span>
-                          <span className="text-[10px] text-slate-400 font-bold ml-1">
-                            {infraGroupOpen ? '▼' : '▶'}
-                          </span>
-                        </button>
+                      {/* Números de Potrero */}
+                      <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
+                        <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                          🏷️ Números de Potrero (P#)
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(layersVisible.potreros_numeros)}
+                          onChange={() =>
+                            setLayersVisible((prev) => ({
+                              ...prev,
+                              potreros_numeros: !prev.potreros_numeros,
+                            }))
+                          }
+                          className="rounded border-slate-600 text-emerald-500 focus:ring-0"
+                        />
+                      </label>
 
-                        {/* Toggle Maestro Toda la Infraestructura */}
-                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-[9px] font-bold text-slate-400 lowercase">
-                            {isAnyInfraOn ? 'todas on' : 'todas off'}
+                      {/* Etiqueta de Rodeos y Cabezas */}
+                      <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
+                        <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                          🐄 Rodeos y Cabezas
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(layersVisible.rodeos_labels)}
+                          onChange={() =>
+                            setLayersVisible((prev) => ({
+                              ...prev,
+                              rodeos_labels: !prev.rodeos_labels,
+                            }))
+                          }
+                          className="rounded border-slate-600 text-emerald-500 focus:ring-0"
+                        />
+                      </label>
+
+                      {/* Selector de Densidad de Carteles (Anti-superposición) */}
+                      <div className="pt-1.5 pb-1 px-1 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-0.5">
+                          <span>📏 Densidad Carteles</span>
+                          <span className="text-[9px] text-emerald-400 font-bold">
+                            {labelDensity === 'auto' ? `Auto (Z${currentZoom})` : labelDensity === 'compacto' ? 'Compacto' : 'Detallado'}
                           </span>
-                          <label
-                            className="relative inline-flex items-center cursor-pointer"
-                            title={
-                              isAnyInfraOn
-                                ? 'Apagar toda la infraestructura con 1 clic (mapa limpio)'
-                                : 'Prender infraestructura esencial con 1 clic'
-                            }
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isAnyInfraOn}
-                              onChange={handleToggleAllInfra}
-                              className="sr-only peer"
-                            />
-                            <div className="w-7 h-4 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { id: 'auto', label: '⚡ Auto' },
+                            { id: 'compacto', label: '🏷️ P# & Cab.' },
+                            { id: 'detallado', label: '📋 Detallado' },
+                          ].map((d) => (
+                            <button
+                              key={d.id}
+                              type="button"
+                              onClick={() => setLabelDensity(d.id)}
+                              className={`px-1.5 py-1 rounded-lg text-[10px] font-bold text-center transition border ${
+                                labelDensity === d.id
+                                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                                  : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-800'
+                              }`}
+                            >
+                              {d.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      {infraGroupOpen && (
-                        <div className="space-y-2.5 pt-1 border-t border-slate-700/60">
-                          {/* 1. Esenciales / Operativos (activos por defecto) */}
-                          <div className="space-y-1">
-                            <div className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              Esenciales (Activos)
-                            </div>
-                            {[
-                              {
-                                key: 'molinos',
-                                label: `Molinos (${infraCounts.molinos})`,
-                                badge:
-                                  infraCounts.molinosSolares > 0
-                                    ? `☀️ ${infraCounts.molinosSolares}`
-                                    : '',
-                                dot: 'bg-sky-500',
-                                checked: Boolean(layersVisible.molinos),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    molinos: !prev.molinos,
-                                  })),
-                              },
-                              {
-                                key: 'tanques_bebidas',
-                                label: `Tanques y Bebidas (${infraCounts.tanquesBebidas})`,
-                                dot: 'bg-cyan-400',
-                                checked: Boolean(layersVisible.tanques_bebidas),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    tanques_bebidas: !prev.tanques_bebidas,
-                                  })),
-                              },
-                              {
-                                key: 'corrales_mangas',
-                                label: `Corrales y Mangas (${infraCounts.corrales})`,
-                                dot: 'bg-orange-500',
-                                checked: Boolean(layersVisible.corrales_mangas),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    corrales_mangas: !prev.corrales_mangas,
-                                  })),
-                              },
-                              {
-                                key: 'tranqueras',
-                                label: `Tranqueras (${infraCounts.tranqueras})`,
-                                badge:
-                                  infraCounts.tranquerones > 0
-                                    ? `🚜 ${infraCounts.tranquerones} TQN`
-                                    : '',
-                                dot: 'bg-slate-900',
-                                checked: Boolean(layersVisible.tranqueras),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    tranqueras: !prev.tranqueras,
-                                  })),
-                              },
-                              {
-                                key: 'montes_sombra',
-                                label: `Montes / Sombra (${infraCounts.montesSombra})`,
-                                dot: 'bg-emerald-700',
-                                checked: Boolean(layersVisible.montes_sombra),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    montes_sombra: !prev.montes_sombra,
-                                  })),
-                              },
-                            ].map((item) => (
-                              <label
-                                key={item.key}
-                                className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
-                              >
-                                <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-200">
-                                  <span className={`w-2 h-2 rounded-full ${item.dot}`} />
-                                  <span>{item.label}</span>
-                                  {item.badge && (
-                                    <span className="text-[9.5px] px-1 rounded bg-emerald-900/80 text-emerald-300 font-extrabold border border-emerald-600/40">
-                                      {item.badge}
-                                    </span>
-                                  )}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  checked={item.checked}
-                                  onChange={item.onToggle}
-                                  className="rounded border-slate-600 text-emerald-500 focus:ring-0 w-3.5 h-3.5"
-                                />
-                              </label>
-                            ))}
-                          </div>
+                      {/* Toggle Rápido: Mostrar texto en marcadores de infraestructura */}
+                      <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg" title="Alternar entre Chips legibles con texto o compactar a Solo Ícono">
+                        <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
+                          <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                          🏷️ Etiquetas en Marcadores
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(layersVisible.etiquetas_marcadores ?? true)}
+                          onChange={() =>
+                            setLayersVisible((prev) => ({
+                              ...prev,
+                              etiquetas_marcadores: !(prev.etiquetas_marcadores ?? true),
+                            }))
+                          }
+                          className="rounded border-slate-600 text-emerald-500 focus:ring-0"
+                        />
+                      </label>
 
-                          {/* 2. Edificaciones / Secundarios (apagados por defecto) */}
-                          <div className="space-y-1 pt-1.5 border-t border-slate-700/60">
-                            <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                              <Eye className="w-3 h-3 text-slate-400" />
-                              Edificaciones / Secundarios
-                            </div>
-                            {[
-                              {
-                                key: 'casco_edificaciones',
-                                label: `Casco, Casas y Galpones (${infraCounts.casco})`,
-                                dot: 'bg-slate-400',
-                                checked: Boolean(layersVisible.casco_edificaciones),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    casco_edificaciones: !prev.casco_edificaciones,
-                                  })),
-                              },
-                              {
-                                key: 'mangrullo',
-                                label: `Mangrullo / Bomba Casco (${infraCounts.mangrullo})`,
-                                dot: 'bg-teal-400',
-                                checked: Boolean(layersVisible.mangrullo),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    mangrullo: !prev.mangrullo,
-                                  })),
-                              },
-                              {
-                                key: 'paneles_solares',
-                                label: `Paneles Solares (${infraCounts.panelesSolares})`,
-                                dot: 'bg-yellow-400',
-                                checked: Boolean(layersVisible.paneles_solares),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    paneles_solares: !prev.paneles_solares,
-                                  })),
-                              },
-                              {
-                                key: 'caminos',
-                                label: `Caminos Operativos (${caminosOperativos.length})`,
-                                dot: 'bg-slate-300',
-                                checked: Boolean(layersVisible.caminos),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    caminos: !prev.caminos,
-                                  })),
-                              },
-                              {
-                                key: 'alambres_electricos',
-                                label: `Alambres Eléctricos / Parcelas (${alambresElectricos.length})`,
-                                dot: 'bg-amber-400',
-                                checked: Boolean(layersVisible.alambres_electricos),
-                                onToggle: () =>
-                                  setLayersVisible((prev) => ({
-                                    ...prev,
-                                    alambres_electricos: !prev.alambres_electricos,
-                                  })),
-                              },
-                            ].map((item) => (
-                              <label
-                                key={item.key}
-                                className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
-                              >
-                                <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
-                                  <span className={`w-2 h-2 rounded-full ${item.dot}`} />
-                                  <span>{item.label}</span>
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  checked={item.checked}
-                                  onChange={item.onToggle}
-                                  className="rounded border-slate-600 text-slate-400 focus:ring-0 w-3.5 h-3.5"
-                                />
-                              </label>
-                            ))}
+                      {/* FILTRO JERÁRQUICO DESPLEGABLE DE INFRAESTRUCTURA CON TOGGLE MAESTRO */}
+                      <div className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 space-y-2">
+                        <div className="w-full flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-emerald-300">
+                          <button
+                            type="button"
+                            onClick={() => setInfraGroupOpen(!infraGroupOpen)}
+                            className="flex items-center gap-1.5 hover:text-emerald-200"
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            <span>Infraestructura ({infraestructura.length})</span>
+                            <span className="text-[10px] text-slate-400 font-bold ml-1">
+                              {infraGroupOpen ? '▼' : '▶'}
+                            </span>
+                          </button>
+
+                          {/* Toggle Maestro Toda la Infraestructura */}
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[9px] font-bold text-slate-400 lowercase">
+                              {isAnyInfraOn ? 'todas on' : 'todas off'}
+                            </span>
+                            <label
+                              className="relative inline-flex items-center cursor-pointer"
+                              title={
+                                isAnyInfraOn
+                                  ? 'Apagar toda la infraestructura con 1 clic (mapa limpio)'
+                                  : 'Prender infraestructura esencial con 1 clic'
+                              }
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isAnyInfraOn}
+                                onChange={handleToggleAllInfra}
+                                className="sr-only peer"
+                              />
+                              <div className="w-7 h-4 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
                           </div>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Post-its de Alerta */}
-                    <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
-                      <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                        📌 Post-its de Alerta ({alertasActivasCount})
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(layersVisible.alertas)}
-                        onChange={() =>
-                          setLayersVisible((prev) => ({
-                            ...prev,
-                            alertas: !prev.alertas,
-                          }))
-                        }
-                        className="rounded border-slate-600 text-emerald-500 focus:ring-0"
-                      />
-                    </label>
+                        {infraGroupOpen && (
+                          <div className="space-y-2.5 pt-1 border-t border-slate-700/60">
+                            {/* 1. Esenciales / Operativos (activos por defecto) */}
+                            <div className="space-y-1">
+                              <div className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                Esenciales (Activos)
+                              </div>
+                              {[
+                                {
+                                  key: 'molinos',
+                                  label: `Molinos (${infraCounts.molinos})`,
+                                  badge:
+                                    infraCounts.molinosSolares > 0
+                                      ? `☀️ ${infraCounts.molinosSolares}`
+                                      : '',
+                                  dot: 'bg-sky-500',
+                                  checked: Boolean(layersVisible.molinos),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      molinos: !prev.molinos,
+                                    })),
+                                },
+                                {
+                                  key: 'tanques_bebidas',
+                                  label: `Tanques y Bebidas (${infraCounts.tanquesBebidas})`,
+                                  dot: 'bg-cyan-400',
+                                  checked: Boolean(layersVisible.tanques_bebidas),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      tanques_bebidas: !prev.tanques_bebidas,
+                                    })),
+                                },
+                                {
+                                  key: 'corrales_mangas',
+                                  label: `Corrales y Mangas (${infraCounts.corrales})`,
+                                  dot: 'bg-orange-500',
+                                  checked: Boolean(layersVisible.corrales_mangas),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      corrales_mangas: !prev.corrales_mangas,
+                                    })),
+                                },
+                                {
+                                  key: 'tranqueras',
+                                  label: `Tranqueras (${infraCounts.tranqueras})`,
+                                  badge:
+                                    infraCounts.tranquerones > 0
+                                      ? `🚜 ${infraCounts.tranquerones} TQN`
+                                      : '',
+                                  dot: 'bg-slate-900',
+                                  checked: Boolean(layersVisible.tranqueras),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      tranqueras: !prev.tranqueras,
+                                    })),
+                                },
+                                {
+                                  key: 'montes_sombra',
+                                  label: `Montes / Sombra (${infraCounts.montesSombra})`,
+                                  dot: 'bg-emerald-700',
+                                  checked: Boolean(layersVisible.montes_sombra),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      montes_sombra: !prev.montes_sombra,
+                                    })),
+                                },
+                              ].map((item) => (
+                                <label
+                                  key={item.key}
+                                  className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
+                                >
+                                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-200">
+                                    <span className={`w-2 h-2 rounded-full ${item.dot}`} />
+                                    <span>{item.label}</span>
+                                    {item.badge && (
+                                      <span className="text-[9.5px] px-1 rounded bg-emerald-900/80 text-emerald-300 font-extrabold border border-emerald-600/40">
+                                        {item.badge}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={item.checked}
+                                    onChange={item.onToggle}
+                                    className="rounded border-slate-600 text-emerald-500 focus:ring-0 w-3.5 h-3.5"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+
+                            {/* 2. Edificaciones / Secundarios (apagados por defecto) */}
+                            <div className="space-y-1 pt-1.5 border-t border-slate-700/60">
+                              <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                <Eye className="w-3 h-3 text-slate-400" />
+                                Edificaciones / Secundarios
+                              </div>
+                              {[
+                                {
+                                  key: 'casco_edificaciones',
+                                  label: `Casco, Casas y Galpones (${infraCounts.casco})`,
+                                  dot: 'bg-slate-400',
+                                  checked: Boolean(layersVisible.casco_edificaciones),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      casco_edificaciones: !prev.casco_edificaciones,
+                                    })),
+                                },
+                                {
+                                  key: 'mangrullo',
+                                  label: `Mangrullo / Bomba Casco (${infraCounts.mangrullo})`,
+                                  dot: 'bg-teal-400',
+                                  checked: Boolean(layersVisible.mangrullo),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      mangrullo: !prev.mangrullo,
+                                    })),
+                                },
+                                {
+                                  key: 'paneles_solares',
+                                  label: `Paneles Solares (${infraCounts.panelesSolares})`,
+                                  dot: 'bg-yellow-400',
+                                  checked: Boolean(layersVisible.paneles_solares),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      paneles_solares: !prev.paneles_solares,
+                                    })),
+                                },
+                                {
+                                  key: 'caminos',
+                                  label: `Caminos Operativos (${caminosOperativos.length})`,
+                                  dot: 'bg-slate-300',
+                                  checked: Boolean(layersVisible.caminos),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      caminos: !prev.caminos,
+                                    })),
+                                },
+                                {
+                                  key: 'alambres_electricos',
+                                  label: `Alambres Eléctricos / Parcelas (${alambresElectricos.length})`,
+                                  dot: 'bg-amber-400',
+                                  checked: Boolean(layersVisible.alambres_electricos),
+                                  onToggle: () =>
+                                    setLayersVisible((prev) => ({
+                                      ...prev,
+                                      alambres_electricos: !prev.alambres_electricos,
+                                    })),
+                                },
+                              ].map((item) => (
+                                <label
+                                  key={item.key}
+                                  className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-700/50 px-1.5 py-0.5 rounded-lg"
+                                >
+                                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
+                                    <span className={`w-2 h-2 rounded-full ${item.dot}`} />
+                                    <span>{item.label}</span>
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={item.checked}
+                                    onChange={item.onToggle}
+                                    className="rounded border-slate-600 text-slate-400 focus:ring-0 w-3.5 h-3.5"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Post-its de Alerta */}
+                      <label className="flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 px-1.5 py-1 rounded-lg">
+                        <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                          📌 Post-its de Alerta ({alertasActivasCount})
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(layersVisible.alertas)}
+                          onChange={() =>
+                            setLayersVisible((prev) => ({
+                              ...prev,
+                              alertas: !prev.alertas,
+                            }))
+                          }
+                          className="rounded border-slate-600 text-emerald-500 focus:ring-0"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               )}
