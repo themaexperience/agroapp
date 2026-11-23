@@ -50,6 +50,7 @@ import { exportarFichaSiembraPDF } from '../utils/pdfHelper';
 import { registrarAuditLog } from '../utils/auditLogger';
 import PotreroCard from './PotreroCard.jsx';
 import GeminiRecetaModal from './GeminiRecetaModal.jsx';
+import NumericInput from './NumericInput';
 
 const CAMPANAS_DISPONIBLES = ['2026/2027', '2025/2026', '2024/2025'];
 const ESTADOS_SIEMBRA = ['Barbecho', 'Sembrado', 'En Pastoreo', 'Cosechado'];
@@ -4409,14 +4410,13 @@ function SiembraEditModal({
                             >
                               {calc.moneda}
                             </button>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
+                            <NumericInput
                               value={r.precio_unitario ?? ''}
-                              onChange={(e) => updateRecetaRow(idx, 'precio_unitario', e.target.value)}
+                              onChange={(val) => updateRecetaRow(idx, 'precio_unitario', val)}
+                              allowDecimals={true}
+                              maxDecimals={2}
                               placeholder={calc.hasEnvase ? `Precio/${calc.pres.envase === 'bolsas' ? 'Bolsa' : 'Envase'}` : `Precio/${calc.pres.unidadBase}`}
-                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-emerald-500"
                             />
                           </div>
                           <div className="text-[9px] text-slate-400">
@@ -4600,14 +4600,13 @@ function SiembraEditModal({
                         {calc.modoCalculo === 'dosis' ? (
                           <>
                             <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
-                              <input
-                                type="number"
-                                step="any"
-                                min="0"
+                              <NumericInput
                                 value={ins.dosis_ha ?? ''}
                                 placeholder="0"
-                                onChange={(e) => updateInsumoRow(idx, 'dosis_ha', e.target.value)}
-                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                onChange={(val) => updateInsumoRow(idx, 'dosis_ha', val)}
+                                allowDecimals={true}
+                                maxDecimals={2}
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
                               />
                               <span
                                 className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
@@ -4624,14 +4623,13 @@ function SiembraEditModal({
                         ) : (
                           <>
                             <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden focus-within:border-amber-400 transition min-w-0">
-                              <input
-                                type="number"
-                                step="any"
-                                min="0"
+                              <NumericInput
                                 value={ins.cantidad ?? ''}
                                 placeholder={calc.hasEnvase ? (calc.pres.envase || 'Bolsas') : '0'}
-                                onChange={(e) => updateInsumoRow(idx, 'cantidad', e.target.value)}
-                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                onChange={(val) => updateInsumoRow(idx, 'cantidad', val)}
+                                allowDecimals={true}
+                                maxDecimals={2}
+                                className="w-full min-w-0 bg-transparent px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none"
                               />
                               <span
                                 className="px-1.5 py-1 bg-slate-800/90 border-l border-slate-700/80 text-[9.5px] text-slate-300 font-bold uppercase shrink-0"
@@ -4673,14 +4671,13 @@ function SiembraEditModal({
                             >
                               {calc.moneda}
                             </button>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
+                            <NumericInput
                               value={ins.precio_unitario ?? ''}
                               placeholder={`P. Unit / ${calc.unidadPrecio}`}
-                              onChange={(e) => updateInsumoRow(idx, 'precio_unitario', e.target.value)}
-                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-amber-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              onChange={(val) => updateInsumoRow(idx, 'precio_unitario', val)}
+                              allowDecimals={true}
+                              maxDecimals={2}
+                              className="w-full min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-amber-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-amber-400"
                             />
                           </div>
                           <div className="text-[9.5px] text-slate-400 pr-1">
@@ -4814,13 +4811,12 @@ function SiembraEditModal({
                       {/* Hectáreas */}
                       <div className="col-span-2 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0.1"
+                          <NumericInput
                             value={lab.ha !== undefined && lab.ha !== '' ? lab.ha : totHaActual}
-                            onChange={(e) => updateLaborRow(idx, 'ha', e.target.value)}
-                            className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            onChange={(val) => updateLaborRow(idx, 'ha', val)}
+                            allowDecimals={true}
+                            maxDecimals={2}
+                            className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400"
                           />
                           <span className="text-[10px] text-slate-400">ha</span>
                         </div>
@@ -4861,14 +4857,13 @@ function SiembraEditModal({
                             >
                               {calc.moneda}
                             </button>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
+                            <NumericInput
                               value={lab.tarifa_ha !== undefined && lab.tarifa_ha !== '' ? lab.tarifa_ha : (lab.costo_ha_usd || '')}
                               placeholder={calc.modoTarifa === 'por_ha' ? 'Tarifa/ha' : 'Monto total'}
-                              onChange={(e) => updateLaborRow(idx, 'tarifa_ha', e.target.value)}
-                              className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-indigo-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              onChange={(val) => updateLaborRow(idx, 'tarifa_ha', val)}
+                              allowDecimals={true}
+                              maxDecimals={2}
+                              className="w-full min-w-[115px] bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-indigo-300 font-mono font-bold text-xs text-right focus:outline-none focus:border-indigo-400"
                             />
                           </div>
                           <div className="text-[9px] text-slate-400 mt-0.5">
@@ -7550,14 +7545,13 @@ function GeminiSiembraModal({
                                     </td>
                                     {isAdmin && (
                                       <td className="py-1.5 px-1 text-right">
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
+                                        <NumericInput
                                           value={lab.precio_unitario || ''}
-                                          onChange={(e) => handleLaborFieldChange(lote.id, labIdx, 'precio_unitario', e.target.value)}
+                                          onChange={(val) => handleLaborFieldChange(lote.id, labIdx, 'precio_unitario', val)}
+                                          allowDecimals={true}
+                                          maxDecimals={2}
                                           placeholder="0"
-                                          className="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right font-mono text-xs text-teal-300 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          className="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right font-mono text-xs text-teal-300 focus:outline-none"
                                         />
                                       </td>
                                     )}
@@ -7680,14 +7674,13 @@ function GeminiSiembraModal({
                                     </td>
                                     {isAdmin && (
                                       <td className="py-1.5 px-1 text-right">
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
+                                        <NumericInput
                                           value={ins.precio_unitario || ''}
-                                          onChange={(e) => handleInsumoFieldChange(lote.id, ins.id, 'precio_unitario', e.target.value)}
+                                          onChange={(val) => handleInsumoFieldChange(lote.id, ins.id, 'precio_unitario', val)}
+                                          allowDecimals={true}
+                                          maxDecimals={2}
                                           placeholder="0.00"
-                                          className="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right font-mono text-xs text-emerald-300 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          className="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right font-mono text-xs text-emerald-300 focus:outline-none"
                                         />
                                       </td>
                                     )}

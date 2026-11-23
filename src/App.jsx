@@ -58,6 +58,7 @@ import CopilotoSanJoseDrawer from './components/CopilotoSanJoseDrawer';
 import CuadrillaPlannerModal from './components/CuadrillaPlannerModal';
 import SystemSnapshotsModal from './components/SystemSnapshotsModal';
 import ConfirmDialog from './components/ConfirmDialog';
+import NumericInput from './components/NumericInput';
 import { getOfflineQueueCount, processOfflineQueue } from './utils/offlineQueue';
 import { INFRAESTRUCTURA_OFICIAL } from './data/infraestructuraOficial';
 
@@ -1960,13 +1961,13 @@ export default function App() {
                   ) : (
                     <div className="inline-flex items-center gap-0.5">
                       <span className="text-xs font-bold text-amber-900">$</span>
-                      <input
+                      <NumericInput
                         id="global-dolar-ref"
-                        type="number"
-                        step="1"
                         value={dolarRef}
-                        onChange={(e) => handleChangeDolarRef(e.target.value)}
-                        className="w-16 h-6 bg-white px-1.5 rounded-lg border border-amber-400 font-extrabold text-xs text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-amber-600 tabular-nums shadow-inner"
+                        onChange={(val) => handleChangeDolarRef(val)}
+                        allowDecimals={true}
+                        maxDecimals={2}
+                        className="w-20 h-6 bg-white px-1.5 rounded-lg border border-amber-400 font-extrabold text-xs text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-amber-600 tabular-nums shadow-inner"
                         title="Tipo de Cambio manual ($/USD)"
                         autoFocus
                       />
@@ -2133,16 +2134,15 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-slate-400 font-bold">$</span>
-                            <input
-                              type="number"
-                              step="50"
+                            <NumericInput
                               value={editandoPreciosHacienda.ternero_kg_ars || ''}
-                              onChange={(e) =>
+                              onChange={(val) =>
                                 setEditandoPreciosHacienda({
                                   ...editandoPreciosHacienda,
-                                  ternero_kg_ars: Number(e.target.value) || 0,
+                                  ternero_kg_ars: val,
                                 })
                               }
+                              allowDecimals={false}
                               className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
                             />
                             <span className="text-[10px] text-slate-400 font-mono">/kg</span>
@@ -2156,16 +2156,15 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-slate-400 font-bold">$</span>
-                            <input
-                              type="number"
-                              step="50"
+                            <NumericInput
                               value={editandoPreciosHacienda.novillito_kg_ars || ''}
-                              onChange={(e) =>
+                              onChange={(val) =>
                                 setEditandoPreciosHacienda({
                                   ...editandoPreciosHacienda,
-                                  novillito_kg_ars: Number(e.target.value) || 0,
+                                  novillito_kg_ars: val,
                                 })
                               }
+                              allowDecimals={false}
                               className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
                             />
                             <span className="text-[10px] text-slate-400 font-mono">/kg</span>
@@ -2179,16 +2178,15 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-slate-400 font-bold">$</span>
-                            <input
-                              type="number"
-                              step="50"
+                            <NumericInput
                               value={editandoPreciosHacienda.vaca_kg_ars || ''}
-                              onChange={(e) =>
+                              onChange={(val) =>
                                 setEditandoPreciosHacienda({
                                   ...editandoPreciosHacienda,
-                                  vaca_kg_ars: Number(e.target.value) || 0,
+                                  vaca_kg_ars: val,
                                 })
                               }
+                              allowDecimals={false}
                               className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
                             />
                             <span className="text-[10px] text-slate-400 font-mono">/kg</span>
@@ -2202,16 +2200,15 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-slate-400 font-bold">$</span>
-                            <input
-                              type="number"
-                              step="50"
+                            <NumericInput
                               value={editandoPreciosHacienda.toro_kg_ars || ''}
-                              onChange={(e) =>
+                              onChange={(val) =>
                                 setEditandoPreciosHacienda({
                                   ...editandoPreciosHacienda,
-                                  toro_kg_ars: Number(e.target.value) || 0,
+                                  toro_kg_ars: val,
                                 })
                               }
+                              allowDecimals={false}
                               className="w-24 bg-slate-900 text-white font-black text-right px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400 text-xs"
                             />
                             <span className="text-[10px] text-slate-400 font-mono">/kg</span>

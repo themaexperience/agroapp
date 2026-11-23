@@ -70,6 +70,7 @@ import {
 } from '../utils/reporteCaravanasSenasa.js';
 import CondicionCorporalStars from './CondicionCorporalStars';
 import PotreroCard from './PotreroCard.jsx';
+import NumericInput from './NumericInput';
 import { inferirRolProtocolo, ROLES_PROTOCOLO } from '../lib/geminiService';
 import { aplicarMovimientoRodeos, CATEGORIAS_PASE } from '../utils/rodeoMovimientos';
 
@@ -4463,12 +4464,11 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Cabezas *
                   </label>
-                  <input
-                    type="number"
-                    min="1"
+                  <NumericInput
                     required
                     value={ventaModal.cabezas}
-                    onChange={(e) => setVentaModal({ ...ventaModal, cabezas: e.target.value })}
+                    onChange={(val) => setVentaModal({ ...ventaModal, cabezas: val })}
+                    allowDecimals={false}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>
@@ -4476,13 +4476,12 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Kilos Totales *
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="1"
+                  <NumericInput
                     required
                     value={ventaModal.kilos_totales}
-                    onChange={(e) => setVentaModal({ ...ventaModal, kilos_totales: e.target.value })}
+                    onChange={(val) => setVentaModal({ ...ventaModal, kilos_totales: val })}
+                    allowDecimals={true}
+                    maxDecimals={2}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>
@@ -4490,13 +4489,12 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Precio / kg *
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.1"
+                  <NumericInput
                     required
                     value={ventaModal.precio_kg}
-                    onChange={(e) => setVentaModal({ ...ventaModal, precio_kg: e.target.value })}
+                    onChange={(val) => setVentaModal({ ...ventaModal, precio_kg: val })}
+                    allowDecimals={true}
+                    maxDecimals={2}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>
@@ -4516,11 +4514,12 @@ export default function RodeosCaravanasView({
                       <option value="ARS">ARS ($)</option>
                       <option value="USD">USD (U$S)</option>
                     </select>
-                    <input
-                      type="number"
+                    <NumericInput
                       placeholder="TC Dólar"
                       value={ventaModal.tipo_cambio}
-                      onChange={(e) => setVentaModal({ ...ventaModal, tipo_cambio: e.target.value })}
+                      onChange={(val) => setVentaModal({ ...ventaModal, tipo_cambio: val })}
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-2 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                       title="Tipo de cambio oficial / referencia"
                     />
@@ -4531,12 +4530,12 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Gastos Comerc. (ARS)
                   </label>
-                  <input
-                    type="number"
-                    step="any"
+                  <NumericInput
                     placeholder="0"
                     value={ventaModal.gastos_comercializacion}
-                    onChange={(e) => setVentaModal({ ...ventaModal, gastos_comercializacion: e.target.value })}
+                    onChange={(val) => setVentaModal({ ...ventaModal, gastos_comercializacion: val })}
+                    allowDecimals={true}
+                    maxDecimals={2}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold"
                   />
                 </div>
@@ -4696,12 +4695,11 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Cantidad de Cabezas *
                   </label>
-                  <input
-                    type="number"
-                    min="1"
+                  <NumericInput
                     required
                     value={compraModal.cabezas}
-                    onChange={(e) => setCompraModal({ ...compraModal, cabezas: e.target.value })}
+                    onChange={(val) => setCompraModal({ ...compraModal, cabezas: val })}
+                    allowDecimals={false}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>
@@ -4709,12 +4707,12 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Monto Total de Compra
                   </label>
-                  <input
-                    type="number"
-                    step="any"
+                  <NumericInput
                     placeholder="0"
                     value={compraModal.monto_total}
-                    onChange={(e) => setCompraModal({ ...compraModal, monto_total: e.target.value })}
+                    onChange={(val) => setCompraModal({ ...compraModal, monto_total: val })}
+                    allowDecimals={true}
+                    maxDecimals={2}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>
@@ -4734,11 +4732,12 @@ export default function RodeosCaravanasView({
                       <option value="ARS">ARS ($)</option>
                       <option value="USD">USD (U$S)</option>
                     </select>
-                    <input
-                      type="number"
+                    <NumericInput
                       placeholder="TC"
                       value={compraModal.tipo_cambio}
-                      onChange={(e) => setCompraModal({ ...compraModal, tipo_cambio: e.target.value })}
+                      onChange={(val) => setCompraModal({ ...compraModal, tipo_cambio: val })}
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-2 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                     />
                   </div>
@@ -4908,12 +4907,12 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Peso Promedio (kg)
                   </label>
-                  <input
-                    type="number"
-                    step="0.1"
+                  <NumericInput
                     placeholder="Ej: 32 kg / 185 kg"
                     value={nacimientoModal.peso_promedio}
-                    onChange={(e) => setNacimientoModal({ ...nacimientoModal, peso_promedio: e.target.value })}
+                    onChange={(val) => setNacimientoModal({ ...nacimientoModal, peso_promedio: val })}
+                    allowDecimals={true}
+                    maxDecimals={2}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs"
                   />
                 </div>
@@ -5036,12 +5035,11 @@ export default function RodeosCaravanasView({
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Cantidad de Cabezas *
                   </label>
-                  <input
-                    type="number"
-                    min="1"
+                  <NumericInput
                     required
                     value={bajaModal.cabezas}
-                    onChange={(e) => setBajaModal({ ...bajaModal, cabezas: e.target.value })}
+                    onChange={(val) => setBajaModal({ ...bajaModal, cabezas: val })}
+                    allowDecimals={false}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-center"
                   />
                 </div>

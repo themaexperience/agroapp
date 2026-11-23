@@ -41,6 +41,7 @@ import GeminiLiquidacionModal from './GeminiLiquidacionModal.jsx';
 import { confirmAction } from './ConfirmDialog.jsx';
 import GeminiBalanceContableModal from './GeminiBalanceContableModal.jsx';
 import FacturaDetalleModal from './FacturaDetalleModal.jsx';
+import NumericInput from './NumericInput.jsx';
 import { exportarListadoGastosPDF } from '../utils/pdfHelper.js';
 
 export const RUBROS_GASTOS = [
@@ -1528,15 +1529,15 @@ export default function CostosFinanzasView({
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Monto ({gastoForm.moneda_carga}) *
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
                       required
-                      placeholder="0.00"
+                      placeholder="0,00"
                       value={gastoForm.monto_original}
-                      onChange={(e) =>
-                        setGastoForm({ ...gastoForm, monto_original: e.target.value })
+                      onChange={(val) =>
+                        setGastoForm({ ...gastoForm, monto_original: val })
                       }
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-3 py-2 rounded-xl border border-emerald-400 text-xs font-extrabold bg-emerald-50/40"
                     />
                   </div>
@@ -1557,13 +1558,13 @@ export default function CostosFinanzasView({
                         <span>🔄 Blue</span>
                       </button>
                     </div>
-                    <input
-                      type="number"
-                      step="1"
+                    <NumericInput
                       value={gastoForm.tipo_cambio}
-                      onChange={(e) =>
-                        setGastoForm({ ...gastoForm, tipo_cambio: e.target.value })
+                      onChange={(val) =>
+                        setGastoForm({ ...gastoForm, tipo_cambio: val })
                       }
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"
                     />
                   </div>
@@ -1953,15 +1954,14 @@ export default function CostosFinanzasView({
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Cantidad Cabezas *
                     </label>
-                    <input
-                      type="number"
-                      min="1"
+                    <NumericInput
                       required
                       placeholder="Ej: 45"
                       value={ventaForm.cantidad_cabezas}
-                      onChange={(e) =>
-                        setVentaForm({ ...ventaForm, cantidad_cabezas: e.target.value })
+                      onChange={(val) =>
+                        setVentaForm({ ...ventaForm, cantidad_cabezas: val })
                       }
+                      allowDecimals={false}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-extrabold"
                     />
                   </div>
@@ -1970,15 +1970,15 @@ export default function CostosFinanzasView({
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Kilos Totales Balanza *
                     </label>
-                    <input
-                      type="number"
-                      step="0.1"
+                    <NumericInput
                       required
                       placeholder="Ej: 9450"
                       value={ventaForm.kilos_totales}
-                      onChange={(e) =>
-                        setVentaForm({ ...ventaForm, kilos_totales: e.target.value })
+                      onChange={(val) =>
+                        setVentaForm({ ...ventaForm, kilos_totales: val })
                       }
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-extrabold"
                     />
                   </div>
@@ -2003,15 +2003,15 @@ export default function CostosFinanzasView({
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Precio por Kg ({ventaForm.moneda_carga}) *
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
                       required
                       placeholder="Ej: 2850"
                       value={ventaForm.precio_kg}
-                      onChange={(e) =>
-                        setVentaForm({ ...ventaForm, precio_kg: e.target.value })
+                      onChange={(val) =>
+                        setVentaForm({ ...ventaForm, precio_kg: val })
                       }
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-3 py-2 rounded-xl border border-sky-400 bg-sky-50/40 text-xs font-extrabold"
                     />
                   </div>
@@ -2020,17 +2020,17 @@ export default function CostosFinanzasView({
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Gastos Comercialización ($ ARS)
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
                       placeholder="Comisión, flete, guías..."
                       value={ventaForm.gastos_comercializacion_ars}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setVentaForm({
                           ...ventaForm,
-                          gastos_comercializacion_ars: e.target.value,
+                          gastos_comercializacion_ars: val,
                         })
                       }
+                      allowDecimals={true}
+                      maxDecimals={2}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold"
                     />
                   </div>

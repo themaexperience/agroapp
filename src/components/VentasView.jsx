@@ -29,6 +29,7 @@ import { supabase } from '../lib/supabase';
 import { formatFechaAR } from '../utils/dateHelper';
 import { exportarListadoVentasPDF, exportarDetalleLiquidacionPDF } from '../utils/pdfHelper';
 import { registrarAuditLog } from '../utils/auditLogger';
+import NumericInput from './NumericInput';
 import {
   analizarLiquidacionHacienda,
   compressImage,
@@ -1063,12 +1064,11 @@ export default function VentasView({
               <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">
                 Cabezas
               </label>
-              <input
-                type="number"
-                min="1"
+              <NumericInput
                 placeholder="10"
                 value={manualForm.cantidad_cabezas}
-                onChange={(e) => setManualForm({ ...manualForm, cantidad_cabezas: e.target.value })}
+                onChange={(val) => setManualForm({ ...manualForm, cantidad_cabezas: val })}
+                allowDecimals={false}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-black text-xs text-center"
                 required
               />
@@ -1078,12 +1078,12 @@ export default function VentasView({
               <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">
                 Kilos Totales
               </label>
-              <input
-                type="number"
-                step="any"
+              <NumericInput
                 placeholder="4200"
                 value={manualForm.kilos_totales}
-                onChange={(e) => setManualForm({ ...manualForm, kilos_totales: e.target.value })}
+                onChange={(val) => setManualForm({ ...manualForm, kilos_totales: val })}
+                allowDecimals={true}
+                maxDecimals={2}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-black text-xs text-right"
                 required
               />
@@ -1093,12 +1093,12 @@ export default function VentasView({
               <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">
                 Precio $/kg Vivo
               </label>
-              <input
-                type="number"
-                step="any"
+              <NumericInput
                 placeholder="2450"
                 value={manualForm.precio_kg}
-                onChange={(e) => setManualForm({ ...manualForm, precio_kg: e.target.value })}
+                onChange={(val) => setManualForm({ ...manualForm, precio_kg: val })}
+                allowDecimals={true}
+                maxDecimals={2}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-black text-xs text-right text-emerald-800"
                 required
               />
@@ -1108,12 +1108,12 @@ export default function VentasView({
               <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">
                 Gastos Comercializ. ($)
               </label>
-              <input
-                type="number"
-                step="any"
+              <NumericInput
                 placeholder="0"
                 value={manualForm.gastos_comercializacion_ars}
-                onChange={(e) => setManualForm({ ...manualForm, gastos_comercializacion_ars: e.target.value })}
+                onChange={(val) => setManualForm({ ...manualForm, gastos_comercializacion_ars: val })}
+                allowDecimals={true}
+                maxDecimals={2}
                 className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-bold text-xs text-right text-rose-700"
               />
             </div>
@@ -1485,29 +1485,28 @@ export default function VentasView({
                             />
                           </td>
                           <td className="p-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
+                            <NumericInput
                               value={item.cantidad_cabezas}
-                              onChange={(e) => updateBatchItem(item.temp_id, 'cantidad_cabezas', e.target.value)}
+                              onChange={(val) => updateBatchItem(item.temp_id, 'cantidad_cabezas', val)}
+                              allowDecimals={false}
                               className="w-16 px-1 py-1 rounded border border-slate-300 text-xs font-black text-center"
                             />
                           </td>
                           <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="any"
+                            <NumericInput
                               value={item.kilos_totales}
-                              onChange={(e) => updateBatchItem(item.temp_id, 'kilos_totales', e.target.value)}
+                              onChange={(val) => updateBatchItem(item.temp_id, 'kilos_totales', val)}
+                              allowDecimals={true}
+                              maxDecimals={2}
                               className="w-20 px-1 py-1 rounded border border-slate-300 text-xs font-black text-right"
                             />
                           </td>
                           <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="any"
+                            <NumericInput
                               value={item.precio_kg}
-                              onChange={(e) => updateBatchItem(item.temp_id, 'precio_kg', e.target.value)}
+                              onChange={(val) => updateBatchItem(item.temp_id, 'precio_kg', val)}
+                              allowDecimals={true}
+                              maxDecimals={2}
                               className="w-20 px-1 py-1 rounded border border-slate-300 text-xs font-black text-right text-emerald-800"
                             />
                           </td>
