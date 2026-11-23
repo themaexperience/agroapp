@@ -566,10 +566,17 @@
             );
           }
 
-          const compiled = window.Babel.transform(source, {
+          let compiled = window.Babel.transform(source, {
             presets: ['react'],
             filename: mod.id,
           }).code;
+
+          // Garantía universal de export default para el cargador dinámico blob:
+          // Si un módulo solo expone exports nombrados, se le añade un export default sintético
+          // para que nunca falle con "does not provide an export named 'default'".
+          if (!/\bexport\s+default\b/.test(compiled)) {
+            compiled += '\nconst __syntheticDefault = {}; export default __syntheticDefault;\n';
+          }
 
           const url = URL.createObjectURL(
             new Blob([compiled], { type: 'application/javascript' })

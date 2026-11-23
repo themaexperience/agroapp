@@ -1,3 +1,5 @@
 // Re-exportación para compatibilidad de nomenclatura
-export { default } from './TableroInicioView';
+import TableroInicioView from './TableroInicioView';
+
+export default TableroInicioView;
 export * from './TableroInicioView';
